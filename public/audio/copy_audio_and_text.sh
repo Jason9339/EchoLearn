@@ -1,4 +1,4 @@
-grep -f text_patterns ../../../cmu_us_bdl_arctic > saying.txt
+grep -f text_patterns ../../../cmu_us_bdl_arctic/etc/txt.done.data > saying.txt
 
 DEST_DIR="cmu_us_bdl_arctic"
 

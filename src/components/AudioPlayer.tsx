@@ -14,6 +14,7 @@ export default function AudioPlayer({
   onPlay,
   onPause,
   className = '',
+  durationOverrideSeconds,
 }: AudioPlayerProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -90,7 +91,8 @@ export default function AudioPlayer({
   };
 
   // Calculate progress percentage
-  const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const effectiveDuration = durationOverrideSeconds ? durationOverrideSeconds : duration;
+  const progressPercentage = effectiveDuration > 0 ? (currentTime / effectiveDuration) * 100 : 0;
 
   if (!audioUrl) {
     return (
@@ -138,7 +140,7 @@ export default function AudioPlayer({
 
           {/* Duration Display */}
           <span className="text-xs text-gray-500 font-mono min-w-[2.5rem]">
-            {formatTime(duration)}
+            {formatTime(effectiveDuration)}
           </span>
         </div>
       </div>

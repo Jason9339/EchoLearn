@@ -7,6 +7,7 @@ import { courses, defaultPracticeCourseId, practiceSentences } from '@/app/lib/p
 import type { PracticeSentence } from '@/app/lib/definitions';
 import type { RecordingState } from '@/types/audio';
 import RecordingButton from '@/components/RecordingButton';
+import AudioPlayer from '@/components/AudioPlayer';
 
 const courseId = defaultPracticeCourseId;
 const fallbackCourseTitle = '口說練習';
@@ -22,10 +23,19 @@ export default function PracticePage() {
   const [recordingStates, setRecordingStates] = useState<SentenceRecordingStates>({});
   const [playingAudio, setPlayingAudio] = useState<{ sentenceId: number; slotIndex: number } | null>(null);
   const [playedSentences, setPlayedSentences] = useState<Set<number>>(new Set());
+  // Control collapse state for legacy three-button section per sentence
+  const [collapsedSentences, setCollapsedSentences] = useState<Record<number, boolean>>({});
   
   // Use refs to store MediaRecorder instances and cleanup functions
   const mediaRecordersRef = useRef<Record<string, MediaRecorder>>({});
   const cleanupFunctionsRef = useRef<Record<string, () => void>>({});
+  
+  // Waveform visualization refs for the single recording bar (slotIndex 3)
+  const waveformCanvasRefs = useRef<Record<string, HTMLCanvasElement | null>>({});
+  const audioContextsRef = useRef<Record<string, AudioContext>>({});
+  const analysersRef = useRef<Record<string, AnalyserNode>>({});
+  const animationFrameIdsRef = useRef<Record<string, number>>({});
+  const playbackSourcesRef = useRef<Record<string, AudioBufferSourceNode>>({});
 
   const currentCourse = courses.find((course) => course.id === courseId);
   const sentences: PracticeSentence[] = practiceSentences[courseId] ?? [];
@@ -261,12 +271,102 @@ export default function PracticePage() {
         clearInterval(durationInterval);
         clearTimeout(autoStopTimeout);
         stream.getTracks().forEach(track => track.stop());
+        
+        // Stop waveform animation and close AudioContext for slot 3
+        if (slotIndex === 3) {
+          const rafId = animationFrameIdsRef.current[recorderKey];
+          if (rafId) {
+            cancelAnimationFrame(rafId);
+            delete animationFrameIdsRef.current[recorderKey];
+          }
+          const ctx = audioContextsRef.current[recorderKey];
+          if (ctx) {
+            ctx.close().catch(() => undefined);
+            delete audioContextsRef.current[recorderKey];
+          }
+          if (analysersRef.current[recorderKey]) {
+            delete analysersRef.current[recorderKey];
+          }
+          const canvas = waveformCanvasRefs.current[recorderKey];
+          if (canvas) {
+            const g = canvas.getContext('2d');
+            if (g) {
+              g.clearRect(0, 0, canvas.width, canvas.height);
+            }
+          }
+        }
         delete mediaRecordersRef.current[recorderKey];
         delete cleanupFunctionsRef.current[recorderKey];
       };
       
       // Store cleanup function
       cleanupFunctionsRef.current[recorderKey] = cleanup;
+
+      // Initialize live waveform visualization for the single recording bar (slotIndex 3)
+      if (slotIndex === 3) {
+        try {
+          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const source = audioContext.createMediaStreamSource(stream);
+          const analyser = audioContext.createAnalyser();
+          analyser.fftSize = 1024;
+          analyser.smoothingTimeConstant = 0.8;
+          source.connect(analyser);
+
+          audioContextsRef.current[recorderKey] = audioContext;
+          analysersRef.current[recorderKey] = analyser;
+
+          const canvas = waveformCanvasRefs.current[recorderKey];
+          const buffer = new Uint8Array(analyser.frequencyBinCount);
+
+          const draw = () => {
+            const cv = waveformCanvasRefs.current[recorderKey];
+            const an = analysersRef.current[recorderKey];
+            if (!cv || !an) return;
+            const ctx2d = cv.getContext('2d');
+            if (!ctx2d) return;
+            const w = cv.width;
+            const h = cv.height;
+
+            // background
+            ctx2d.fillStyle = '#f8fafc';
+            ctx2d.fillRect(0, 0, w, h);
+
+            // grid baseline
+            ctx2d.strokeStyle = '#e5e7eb';
+            ctx2d.lineWidth = 1;
+            ctx2d.beginPath();
+            ctx2d.moveTo(0, h / 2);
+            ctx2d.lineTo(w, h / 2);
+            ctx2d.stroke();
+
+            // get data and compute bars along time (fixed 10s)
+            an.getByteTimeDomainData(buffer);
+            // compute instantaneous amplitude
+            let sum = 0;
+            for (let i = 0; i < buffer.length; i++) {
+              const v = (buffer[i] - 128) / 128;
+              sum += v * v;
+            }
+            const rms = Math.sqrt(sum / buffer.length); // 0..1
+
+            const elapsed = Math.min(Date.now() - startTime, 10000);
+            const x = Math.floor((elapsed / 10000) * w);
+            const barHeight = Math.max(2, Math.floor(rms * h));
+            const y = Math.floor(h / 2 - barHeight / 2);
+
+            // draw progressive bar (we do not clear previous, so it builds over time)
+            ctx2d.fillStyle = '#0ea5e9';
+            ctx2d.fillRect(x, y, 2, barHeight);
+
+            const rafId = requestAnimationFrame(draw);
+            animationFrameIdsRef.current[recorderKey] = rafId;
+          };
+          // kick off animation
+          draw();
+        } catch (e) {
+          console.error('Waveform initialization failed', e);
+        }
+      }
       
       console.log('Recording setup completed successfully');
 
@@ -314,27 +414,148 @@ export default function PracticePage() {
   }, []);
 
   // Handle audio playback for a specific slot
-  const handlePlayRecording = useCallback((sentenceId: number, slotIndex: number) => {
+  const handlePlayRecording = useCallback(async (sentenceId: number, slotIndex: number) => {
     const recordingState = getRecordingState(sentenceId, slotIndex);
-    
-    if (recordingState.audioUrl) {
-      setPlayingAudio({ sentenceId, slotIndex });
-      
-      const audio = new Audio(recordingState.audioUrl);
-      audio.play().catch(error => {
-        console.error('Failed to play audio:', error);
-        updateRecordingState(sentenceId, slotIndex, {
-          error: 'PLAYBACK_ERROR',
-        });
-        setPlayingAudio(null);
-      });
+    if (!recordingState.audioUrl) return;
 
-      // Handle audio end
-      audio.onended = () => {
+    // Special handling for single-bar (slot 3): visualize during playback
+    if (slotIndex === 3) {
+      const playKey = `${sentenceId}-${slotIndex}-play`;
+      // Clean up any previous playback session
+      try {
+        const prevRaf = animationFrameIdsRef.current[playKey];
+        if (prevRaf) cancelAnimationFrame(prevRaf);
+        const prevCtx = audioContextsRef.current[playKey];
+        if (prevCtx) await prevCtx.close();
+        const prevSrc = playbackSourcesRef.current[playKey];
+        if (prevSrc) prevSrc.stop();
+      } catch {}
+
+      try {
+        setPlayingAudio({ sentenceId, slotIndex });
+
+        // Build AudioContext graph
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const response = await fetch(recordingState.audioUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 1024;
+        analyser.smoothingTimeConstant = 0.8;
+        source.connect(analyser);
+        analyser.connect(audioContext.destination);
+
+        audioContextsRef.current[playKey] = audioContext;
+        analysersRef.current[playKey] = analyser;
+        playbackSourcesRef.current[playKey] = source;
+
+        const canvas = waveformCanvasRefs.current[`${sentenceId}-3`];
+        const buffer = new Uint8Array(analyser.frequencyBinCount);
+        const startTime = audioContext.currentTime;
+        const durationSec = Math.min(10, audioBuffer.duration);
+
+        const draw = () => {
+          const cv = waveformCanvasRefs.current[`${sentenceId}-3`];
+          const an = analysersRef.current[playKey];
+          if (!cv || !an) return;
+          const g = cv.getContext('2d');
+          if (!g) return;
+
+          const w = cv.width;
+          const h = cv.height;
+          g.fillStyle = '#f8fafc';
+          g.fillRect(0, 0, w, h);
+          g.strokeStyle = '#e5e7eb';
+          g.lineWidth = 1;
+          g.beginPath();
+          g.moveTo(0, h / 2);
+          g.lineTo(w, h / 2);
+          g.stroke();
+
+          // Progress position based on currentTime
+          const elapsed = audioContext.currentTime - startTime;
+          const progress = Math.min(elapsed / durationSec, 1);
+          const x = Math.floor(progress * w);
+
+          // Instantaneous amplitude bar
+          an.getByteTimeDomainData(buffer);
+          let sum = 0;
+          for (let i = 0; i < buffer.length; i++) {
+            const v = (buffer[i] - 128) / 128;
+            sum += v * v;
+          }
+          const rms = Math.sqrt(sum / buffer.length);
+          const barHeight = Math.max(2, Math.floor(rms * h));
+          const y = Math.floor(h / 2 - barHeight / 2);
+
+          g.fillStyle = '#0ea5e9';
+          g.fillRect(0, y, x, barHeight); // fill up to progress
+
+          if (progress < 1) {
+            const raf = requestAnimationFrame(draw);
+            animationFrameIdsRef.current[playKey] = raf;
+          }
+        };
+
+        source.start(0);
+        draw();
+
+        source.onended = () => {
+          setPlayingAudio(null);
+          const raf = animationFrameIdsRef.current[playKey];
+          if (raf) cancelAnimationFrame(raf);
+          delete animationFrameIdsRef.current[playKey];
+          if (audioContextsRef.current[playKey]) {
+            audioContextsRef.current[playKey].close().catch(() => undefined);
+            delete audioContextsRef.current[playKey];
+          }
+          delete analysersRef.current[playKey];
+          delete playbackSourcesRef.current[playKey];
+        };
+      } catch (e) {
+        console.error('Playback with visualization failed:', e);
+        updateRecordingState(sentenceId, slotIndex, { error: 'PLAYBACK_ERROR' });
         setPlayingAudio(null);
-      };
+      }
+      return;
     }
+
+    // Default playback for other slots
+    const audio = new Audio(recordingState.audioUrl);
+    setPlayingAudio({ sentenceId, slotIndex });
+    audio.play().catch(error => {
+      console.error('Failed to play audio:', error);
+      updateRecordingState(sentenceId, slotIndex, { error: 'PLAYBACK_ERROR' });
+      setPlayingAudio(null);
+    });
+    audio.onended = () => setPlayingAudio(null);
   }, [getRecordingState, updateRecordingState]);
+
+  const handlePauseRecording = useCallback((sentenceId: number, slotIndex: number) => {
+    if (slotIndex === 3) {
+      const playKey = `${sentenceId}-${slotIndex}-play`;
+      const src = playbackSourcesRef.current[playKey];
+      if (src) {
+        try { src.stop(); } catch {}
+        delete playbackSourcesRef.current[playKey];
+      }
+      const raf = animationFrameIdsRef.current[playKey];
+      if (raf) {
+        cancelAnimationFrame(raf);
+        delete animationFrameIdsRef.current[playKey];
+      }
+      const ctx = audioContextsRef.current[playKey];
+      if (ctx) {
+        ctx.close().catch(() => undefined);
+        delete audioContextsRef.current[playKey];
+      }
+      delete analysersRef.current[playKey];
+    }
+    setPlayingAudio(null);
+  }, []);
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 md:py-12">
@@ -388,8 +609,59 @@ export default function PracticePage() {
                 </div>
               </div>
 
-              {/* Recording Section */}
-              <div className="border-t pt-6">
+              {/* Single Recording Bar (Production Version) */}
+              <div className="relative mb-6 rounded-lg border border-gray-200 bg-white px-4 py-3">
+                {/* Collapse toggle button (^ / v) placed here; it controls legacy section below */}
+                <button
+                  type="button"
+                  onClick={() => setCollapsedSentences(prev => ({ ...prev, [sentence.id]: !prev[sentence.id] }))}
+                  className="absolute right-2 top-2 text-gray-500 hover:text-gray-700 text-xs"
+                  aria-label={collapsedSentences[sentence.id] ? '展開' : '收合'}
+                  title={collapsedSentences[sentence.id] ? '展開舊的錄音練習' : '收合舊的錄音練習'}
+                >
+                  {collapsedSentences[sentence.id] ? 'v' : '^'}
+                </button>
+
+                <div className="flex items-center gap-4">
+                  {/* Left: Single Recording Button (uses slotIndex 3 to avoid conflict) */}
+                  <div className="flex items-center gap-3">
+                    <RecordingButton
+                      slotIndex={3}
+                      sentenceId={sentence.id}
+                      recordingState={getRecordingState(sentence.id, 3)}
+                      onStartRecording={() => handleStartRecording(sentence.id, 3)}
+                      onStopRecording={() => handleStopRecording(sentence.id, 3)}
+                      onPlayRecording={() => handlePlayRecording(sentence.id, 3)}
+                      hasPlayedOriginal={playedSentences.has(sentence.id)}
+                      showDetails={false}
+                    />
+                  </div>
+
+                  {/* Right: Waveform container placeholder (to be implemented in step 2) */}
+                  <div className="flex-1">
+                    <canvas
+                      ref={(el) => { waveformCanvasRefs.current[`${sentence.id}-3`] = el; }}
+                      className="w-full rounded-md ring-1 ring-inset ring-gray-200 bg-gray-50"
+                      style={{ height: '80px' }}
+                      width={800}
+                      height={80}
+                    />
+                    <div className="mt-2">
+                      <AudioPlayer
+                        audioUrl={getRecordingState(sentence.id, 3).audioUrl}
+                        isPlaying={playingAudio?.sentenceId === sentence.id && playingAudio?.slotIndex === 3}
+                        onPlay={() => handlePlayRecording(sentence.id, 3)}
+                        onPause={() => handlePauseRecording(sentence.id, 3)}
+                        className="text-xs"
+                        durationOverrideSeconds={10}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recording Section (legacy three-button block). To hide permanently, comment out this entire <div> ... </div> block. */}
+              <div className={`border-t pt-6 ${collapsedSentences[sentence.id] ? 'hidden' : ''}`}>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base font-medium text-gray-900">錄音練習</h3>
                   {hasAnyRecording && (

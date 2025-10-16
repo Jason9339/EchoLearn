@@ -18,6 +18,7 @@ export default function RecordingButton({
   onPlayRecording,
   disabled = false,
   hasPlayedOriginal = false,
+  showDetails = true,
 }: RecordingButtonProps) {
   // Check if this slot can start recording
   const canStartRecording = hasPlayedOriginal && !recordingState.audioBlob && !recordingState.isRecording && !recordingState.isUploading;
@@ -247,20 +248,20 @@ export default function RecordingButton({
       )}
 
       {/* Audio Player */}
-      {recordingState.audioBlob && !recordingState.isRecording && (
+      {showDetails && recordingState.audioBlob && !recordingState.isRecording && (
         <div className="w-full max-w-48">
           <AudioPlayer
             audioUrl={recordingState.audioUrl}
             isPlaying={isPlaying}
             onPlay={onPlayRecording}
-            onPause={() => {}} // This would be handled by parent
+            onPause={() => {}}
             className="text-xs"
           />
         </div>
       )}
 
       {/* Recording Info */}
-      {recordingState.audioBlob && !recordingState.isRecording && (
+      {showDetails && recordingState.audioBlob && !recordingState.isRecording && (
         <div className="text-xs text-gray-500 text-center">
           <div>時長: {(recordingState.duration / 1000).toFixed(1)}s</div>
           <div>大小: {(recordingState.audioBlob.size / 1024).toFixed(1)}KB</div>

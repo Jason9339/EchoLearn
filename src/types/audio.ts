@@ -44,6 +44,8 @@ export interface AudioPlayerProps {
   onPause: () => void;
   /** Additional CSS classes */
   className?: string;
+  /** Optional: override the right-side duration display in seconds */
+  durationOverrideSeconds?: number;
 }
 
 export type ButtonState = 
@@ -71,6 +73,8 @@ export interface RecordingButtonProps {
   disabled?: boolean;
   /** Whether the sentence has been played */
   hasPlayedOriginal?: boolean;
+  /** Whether to show playback section and duration/size info */
+  showDetails?: boolean;
 }
 
 // API related types

@@ -137,7 +137,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       // Auto-stop after 10 seconds
       autoStopTimeoutRef.current = setTimeout(() => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-          stopRecording();
+          mediaRecorderRef.current.stop();
         }
       }, 10000);
 

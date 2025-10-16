@@ -166,22 +166,6 @@ export default function RecordingButton({
           </div>
         )}
 
-        {/* Ready to Record Message Overlay - Only show if not recording */}
-        {getButtonState() === 'ready' && getButtonState() !== 'recording' && (
-          <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 z-20">
-            <div className="bg-blue-500 text-white text-xs px-3 py-2 rounded-lg shadow-lg whitespace-nowrap animate-pulse">
-              <div className="flex items-center gap-1">
-                <span>✨</span>
-                <span>可以開始錄音</span>
-              </div>
-              {/* Arrow pointing down */}
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2">
-                <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-blue-500"></div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Warning Message Overlay - Only show if not recording and not ready */}
         {recordingState.error === 'PLAY_FIRST' && getButtonState() !== 'recording' && getButtonState() !== 'ready' && (
           <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 z-20">

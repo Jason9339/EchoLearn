@@ -62,7 +62,7 @@ export default function PracticePage() {
   }, []);
 
   // Initialize recording state for a sentence slot
-  const initializeRecordingState = useCallback((sentenceId: number, slotIndex: number): RecordingState => {
+  const initializeRecordingState = useCallback((): RecordingState => {
     return {
       isRecording: false,
       audioBlob: null,
@@ -75,14 +75,14 @@ export default function PracticePage() {
 
   // Get recording state for a specific sentence and slot
   const getRecordingState = useCallback((sentenceId: number, slotIndex: number): RecordingState => {
-    return recordingStates[sentenceId]?.[slotIndex] || initializeRecordingState(sentenceId, slotIndex);
+    return recordingStates[sentenceId]?.[slotIndex] || initializeRecordingState();
   }, [recordingStates, initializeRecordingState]);
 
   // Update recording state for a specific sentence and slot
   const updateRecordingState = useCallback((sentenceId: number, slotIndex: number, updates: Partial<RecordingState>) => {
     console.log('updateRecordingState called:', { sentenceId, slotIndex, updates });
     setRecordingStates(prev => {
-      const currentState = prev[sentenceId]?.[slotIndex] || initializeRecordingState(sentenceId, slotIndex);
+      const currentState = prev[sentenceId]?.[slotIndex] || initializeRecordingState();
       const newState = {
         ...prev,
         [sentenceId]: {
@@ -305,7 +305,11 @@ export default function PracticePage() {
       // Initialize live waveform visualization for the single recording bar (slotIndex 3)
       if (slotIndex === 3) {
         try {
-          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+          if (!AudioContextClass) {
+            throw new Error('AudioContext not supported');
+          }
+          const audioContext = new AudioContextClass();
           const source = audioContext.createMediaStreamSource(stream);
           const analyser = audioContext.createAnalyser();
           analyser.fftSize = 1024;
@@ -315,7 +319,6 @@ export default function PracticePage() {
           audioContextsRef.current[recorderKey] = audioContext;
           analysersRef.current[recorderKey] = analyser;
 
-          const canvas = waveformCanvasRefs.current[recorderKey];
           const buffer = new Uint8Array(analyser.frequencyBinCount);
 
           const draw = () => {
@@ -435,7 +438,11 @@ export default function PracticePage() {
         setPlayingAudio({ sentenceId, slotIndex });
 
         // Build AudioContext graph
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!AudioContextClass) {
+          throw new Error('AudioContext not supported');
+        }
+        const audioContext = new AudioContextClass();
         const response = await fetch(recordingState.audioUrl);
         const arrayBuffer = await response.arrayBuffer();
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
@@ -452,7 +459,6 @@ export default function PracticePage() {
         analysersRef.current[playKey] = analyser;
         playbackSourcesRef.current[playKey] = source;
 
-        const canvas = waveformCanvasRefs.current[`${sentenceId}-3`];
         const buffer = new Uint8Array(analyser.frequencyBinCount);
         const startTime = audioContext.currentTime;
         const durationSec = Math.min(10, audioBuffer.duration);
@@ -675,8 +681,6 @@ export default function PracticePage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {[0, 1, 2].map((slotIndex) => {
                     const recordingState = getRecordingState(sentence.id, slotIndex);
-                    const isPlaying = playingAudio?.sentenceId === sentence.id && 
-                                   playingAudio?.slotIndex === slotIndex;
 
                     return (
                       <div key={slotIndex} className="space-y-3">

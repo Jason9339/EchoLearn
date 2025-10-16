@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { PlayIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/outline';
+import { PlayIcon, MicrophoneIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/outline';
+
 import { courses, defaultPracticeCourseId, practiceSentences } from '@/app/lib/placeholder-data';
 import type { PracticeSentence } from '@/app/lib/definitions';
 import type { RecordingState } from '@/types/audio';
@@ -569,7 +571,7 @@ export default function PracticePage() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-sm text-gray-500">
-              {currentCourse ? `${currentCourse.title} · 假資料 Demo` : 'EchoLearn · 假資料 Demo'}
+              {currentCourse ? currentCourse.title : 'EchoLearn'}
             </p>
             <h1 className="mt-1 text-2xl font-semibold text-gray-900">
               {currentCourse?.title ?? fallbackCourseTitle}

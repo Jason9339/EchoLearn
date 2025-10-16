@@ -1,6 +1,6 @@
 'use server';
 
-import { signIn } from '@/auth';
+import { signIn, auth } from '@/auth';
 import { AuthError } from 'next-auth';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
@@ -49,7 +49,7 @@ export async function registerAction(
     if (!parsed.success) return 'Invalid form data.';
 
     const name = parsed.data.name.trim();
-    const email = parsed.data.email.toLowerCase().trim();
+    const email = parsed.data.email.trim();
     const password = parsed.data.password;
 
     // Check if email already exists
@@ -89,5 +89,37 @@ export async function registerAction(
     }
     console.error('[registerAction] error:', err);
     return 'Something went wrong.';
+  }
+}
+
+export async function updateUserInfo(
+  studentId: string,
+  gender: string,
+  age: number,
+  consent: boolean
+) {
+  const session = await auth();
+  if (!session?.user?.email) {
+    return { message: 'Unauthorized' };
+  }
+
+  if (!studentId || !gender || !age || consent === undefined) {
+    return { message: 'Missing required fields' };
+  }
+
+  try {
+    await sql`
+      UPDATE users
+      SET student_id = ${studentId},
+          gender = ${gender},
+          age = ${age},
+          consent = ${consent}
+      WHERE email = ${session.user.email}
+    `;
+
+    return { message: 'User information saved successfully' };
+  } catch (error) {
+    console.error('Failed to save user information:', error);
+    return { message: 'Failed to save user information' };
   }
 }

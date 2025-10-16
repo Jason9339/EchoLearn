@@ -2,12 +2,20 @@ import type { Course, PracticeSentence } from '@/app/lib/definitions';
 
 export const courses: Course[] = [
   {
-    id: 'shadowing-101',
-    title: 'Shadowing 101',
+    id: 'shadowing-101-male',
+    title: 'Shadowing 101-Male',
     description: '基礎影子跟讀課程，從簡單句子開始。',
     actionLabel: '開始練習',
     practicePath: '/dashboard/course/practice',
   },
+  {
+    id: 'shadowing-101-female',
+    title: 'Shadowing 101-Female',
+    description: '基礎影子跟讀課程，從簡單句子開始。',
+    actionLabel: '開始練習',
+    practicePath: '/dashboard/course/practice',
+  },
+
   {
     id: 'daily-practice',
     title: 'Daily Practice',

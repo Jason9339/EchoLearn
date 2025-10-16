@@ -3,13 +3,13 @@
 import Link from 'next/link';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { PlayIcon, MicrophoneIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/outline';
+import { PlayIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/outline';
+import { useSession } from 'next-auth/react';
 
 import { courses, defaultPracticeCourseId, practiceSentences } from '@/app/lib/placeholder-data';
 import type { PracticeSentence } from '@/app/lib/definitions';
 import type { RecordingState } from '@/types/audio';
 import RecordingButton from '@/components/RecordingButton';
-import AudioPlayer from '@/components/AudioPlayer';
 
 const courseId = defaultPracticeCourseId;
 const fallbackCourseTitle = '口說練習';
@@ -22,25 +22,112 @@ type SentenceRecordingStates = {
 };
 
 export default function PracticePage() {
+  const { status: sessionStatus } = useSession();
   const [recordingStates, setRecordingStates] = useState<SentenceRecordingStates>({});
-  const [playingAudio, setPlayingAudio] = useState<{ sentenceId: number; slotIndex: number } | null>(null);
   const [playedSentences, setPlayedSentences] = useState<Set<number>>(new Set());
-  // Control collapse state for legacy three-button section per sentence
-  const [collapsedSentences, setCollapsedSentences] = useState<Record<number, boolean>>({});
-  
+
   // Use refs to store MediaRecorder instances and cleanup functions
   const mediaRecordersRef = useRef<Record<string, MediaRecorder>>({});
   const cleanupFunctionsRef = useRef<Record<string, () => void>>({});
-  
-  // Waveform visualization refs for the single recording bar (slotIndex 3)
-  const waveformCanvasRefs = useRef<Record<string, HTMLCanvasElement | null>>({});
-  const audioContextsRef = useRef<Record<string, AudioContext>>({});
-  const analysersRef = useRef<Record<string, AnalyserNode>>({});
-  const animationFrameIdsRef = useRef<Record<string, number>>({});
-  const playbackSourcesRef = useRef<Record<string, AudioBufferSourceNode>>({});
 
   const currentCourse = courses.find((course) => course.id === courseId);
   const sentences: PracticeSentence[] = practiceSentences[courseId] ?? [];
+
+  // Initialize recording state for a sentence slot
+  const initializeRecordingState = useCallback((): RecordingState => {
+    return {
+      isRecording: false,
+      audioBlob: null,
+      duration: 0,
+      audioUrl: null,
+      isUploading: false,
+      error: null,
+      fileSize: null,
+    };
+  }, []);
+
+  // Update recording state for a specific sentence and slot
+  const updateRecordingState = useCallback((sentenceId: number, slotIndex: number, updates: Partial<RecordingState>) => {
+    console.log('updateRecordingState called:', { sentenceId, slotIndex, updates });
+    setRecordingStates(prev => {
+      const currentState = prev[sentenceId]?.[slotIndex] || initializeRecordingState();
+      const newState = {
+        ...prev,
+        [sentenceId]: {
+          ...prev[sentenceId],
+          [slotIndex]: {
+            ...currentState,
+            ...updates,
+          },
+        },
+      };
+      console.log('New recording state:', newState);
+      return newState;
+    });
+  }, [initializeRecordingState]);
+
+  // Load existing recordings on mount
+  useEffect(() => {
+    if (sessionStatus === 'loading' || sessionStatus === 'unauthenticated') {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const loadRecordings = async () => {
+      try {
+        const response = await fetch('/api/audio/recordings', {
+          credentials: 'include',
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => 'Unknown error');
+          if (response.status !== 401) {
+            console.error('Failed to load recordings:', response.status, errorText);
+          }
+          // Don't block the app if recordings can't be loaded
+          return;
+        }
+
+        const data = await response.json();
+        console.log('Loaded recordings:', data);
+        if (data.success && data.recordings && data.recordings.length > 0) {
+          // Set existing recordings to state
+          data.recordings.forEach((rec: {
+            id: string;
+            sentenceId: number;
+            slotIndex: number;
+            audioUrl: string;
+            duration: number;
+            fileSize: number;
+            createdAt: string;
+          }) => {
+            updateRecordingState(rec.sentenceId, rec.slotIndex, {
+              audioBlob: null, // We don't have the blob, but we have the URL
+              audioUrl: rec.audioUrl,
+              duration: rec.duration,
+              isRecording: false,
+              isUploading: false,
+              error: null,
+              fileSize: rec.fileSize ?? null,
+            });
+          });
+        }
+      } catch (error) {
+        // Ignore AbortError when component unmounts
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
+        console.error('Error loading recordings:', error);
+      }
+    };
+
+    loadRecordings();
+
+    return () => {
+      controller.abort();
+    };
+  }, [sessionStatus, updateRecordingState]);
 
   // Cleanup effect for component unmount
   useEffect(() => {
@@ -63,54 +150,24 @@ export default function PracticePage() {
     };
   }, []);
 
-  // Initialize recording state for a sentence slot
-  const initializeRecordingState = useCallback((): RecordingState => {
-    return {
-      isRecording: false,
-      audioBlob: null,
-      duration: 0,
-      audioUrl: null,
-      isUploading: false,
-      error: null,
-    };
-  }, []);
-
   // Get recording state for a specific sentence and slot
   const getRecordingState = useCallback((sentenceId: number, slotIndex: number): RecordingState => {
     return recordingStates[sentenceId]?.[slotIndex] || initializeRecordingState();
   }, [recordingStates, initializeRecordingState]);
 
-  // Update recording state for a specific sentence and slot
-  const updateRecordingState = useCallback((sentenceId: number, slotIndex: number, updates: Partial<RecordingState>) => {
-    console.log('updateRecordingState called:', { sentenceId, slotIndex, updates });
-    setRecordingStates(prev => {
-      const currentState = prev[sentenceId]?.[slotIndex] || initializeRecordingState();
-      const newState = {
-        ...prev,
-        [sentenceId]: {
-          ...prev[sentenceId],
-          [slotIndex]: {
-            ...currentState,
-            ...updates,
-          },
-        },
-      };
-      console.log('New recording state:', newState);
-      return newState;
-    });
-  }, [initializeRecordingState]);
-
-  // Handle TTS playback
+  // Handle audio playback
   const handlePlay = (sentence: PracticeSentence) => {
     if (typeof window === 'undefined') return;
 
     // Immediately mark sentence as played when user clicks play button
     setPlayedSentences(prev => new Set(prev).add(sentence.id));
 
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(sentence.text);
-      window.speechSynthesis.speak(utterance);
+    // Play the actual audio file
+    if (sentence.audioSrc) {
+      const audio = new Audio(sentence.audioSrc);
+      audio.play().catch(error => {
+        console.error('Failed to play audio:', error);
+      });
     }
   };
 
@@ -138,10 +195,7 @@ export default function PracticePage() {
 
     try {
       console.log('Starting recording process...');
-      
-      // Stop any currently playing audio
-      setPlayingAudio(null);
-      
+
       // Update state to recording
       updateRecordingState(sentenceId, slotIndex, {
         isRecording: true,
@@ -207,14 +261,16 @@ export default function PracticePage() {
         console.log('Recording stopped, processing audio...');
         const audioBlob = new Blob(chunks, { type: 'audio/webm' });
         const audioUrl = URL.createObjectURL(audioBlob);
-        
+        const recordingDuration = Date.now() - startTime;
+
         console.log('Audio blob created:', audioBlob.size, 'bytes');
-        
+
         updateRecordingState(sentenceId, slotIndex, {
           isRecording: false,
           audioBlob,
           audioUrl,
-          duration: Date.now() - startTime,
+          duration: recordingDuration,
+          fileSize: audioBlob.size,
         });
 
         // Call cleanup function
@@ -222,7 +278,7 @@ export default function PracticePage() {
         if (cleanup) {
           cleanup();
         }
-        
+
         console.log('Recording completed successfully');
       };
 
@@ -273,106 +329,13 @@ export default function PracticePage() {
         clearInterval(durationInterval);
         clearTimeout(autoStopTimeout);
         stream.getTracks().forEach(track => track.stop());
-        
-        // Stop waveform animation and close AudioContext for slot 3
-        if (slotIndex === 3) {
-          const rafId = animationFrameIdsRef.current[recorderKey];
-          if (rafId) {
-            cancelAnimationFrame(rafId);
-            delete animationFrameIdsRef.current[recorderKey];
-          }
-          const ctx = audioContextsRef.current[recorderKey];
-          if (ctx) {
-            ctx.close().catch(() => undefined);
-            delete audioContextsRef.current[recorderKey];
-          }
-          if (analysersRef.current[recorderKey]) {
-            delete analysersRef.current[recorderKey];
-          }
-          const canvas = waveformCanvasRefs.current[recorderKey];
-          if (canvas) {
-            const g = canvas.getContext('2d');
-            if (g) {
-              g.clearRect(0, 0, canvas.width, canvas.height);
-            }
-          }
-        }
         delete mediaRecordersRef.current[recorderKey];
         delete cleanupFunctionsRef.current[recorderKey];
       };
-      
+
       // Store cleanup function
       cleanupFunctionsRef.current[recorderKey] = cleanup;
 
-      // Initialize live waveform visualization for the single recording bar (slotIndex 3)
-      if (slotIndex === 3) {
-        try {
-          const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-          if (!AudioContextClass) {
-            throw new Error('AudioContext not supported');
-          }
-          const audioContext = new AudioContextClass();
-          const source = audioContext.createMediaStreamSource(stream);
-          const analyser = audioContext.createAnalyser();
-          analyser.fftSize = 1024;
-          analyser.smoothingTimeConstant = 0.8;
-          source.connect(analyser);
-
-          audioContextsRef.current[recorderKey] = audioContext;
-          analysersRef.current[recorderKey] = analyser;
-
-          const buffer = new Uint8Array(analyser.frequencyBinCount);
-
-          const draw = () => {
-            const cv = waveformCanvasRefs.current[recorderKey];
-            const an = analysersRef.current[recorderKey];
-            if (!cv || !an) return;
-            const ctx2d = cv.getContext('2d');
-            if (!ctx2d) return;
-            const w = cv.width;
-            const h = cv.height;
-
-            // background
-            ctx2d.fillStyle = '#f8fafc';
-            ctx2d.fillRect(0, 0, w, h);
-
-            // grid baseline
-            ctx2d.strokeStyle = '#e5e7eb';
-            ctx2d.lineWidth = 1;
-            ctx2d.beginPath();
-            ctx2d.moveTo(0, h / 2);
-            ctx2d.lineTo(w, h / 2);
-            ctx2d.stroke();
-
-            // get data and compute bars along time (fixed 10s)
-            an.getByteTimeDomainData(buffer);
-            // compute instantaneous amplitude
-            let sum = 0;
-            for (let i = 0; i < buffer.length; i++) {
-              const v = (buffer[i] - 128) / 128;
-              sum += v * v;
-            }
-            const rms = Math.sqrt(sum / buffer.length); // 0..1
-
-            const elapsed = Math.min(Date.now() - startTime, 10000);
-            const x = Math.floor((elapsed / 10000) * w);
-            const barHeight = Math.max(2, Math.floor(rms * h));
-            const y = Math.floor(h / 2 - barHeight / 2);
-
-            // draw progressive bar (we do not clear previous, so it builds over time)
-            ctx2d.fillStyle = '#0ea5e9';
-            ctx2d.fillRect(x, y, 2, barHeight);
-
-            const rafId = requestAnimationFrame(draw);
-            animationFrameIdsRef.current[recorderKey] = rafId;
-          };
-          // kick off animation
-          draw();
-        } catch (e) {
-          console.error('Waveform initialization failed', e);
-        }
-      }
-      
       console.log('Recording setup completed successfully');
 
     } catch (error) {
@@ -423,147 +386,79 @@ export default function PracticePage() {
     const recordingState = getRecordingState(sentenceId, slotIndex);
     if (!recordingState.audioUrl) return;
 
-    // Special handling for single-bar (slot 3): visualize during playback
-    if (slotIndex === 3) {
-      const playKey = `${sentenceId}-${slotIndex}-play`;
-      // Clean up any previous playback session
-      try {
-        const prevRaf = animationFrameIdsRef.current[playKey];
-        if (prevRaf) cancelAnimationFrame(prevRaf);
-        const prevCtx = audioContextsRef.current[playKey];
-        if (prevCtx) await prevCtx.close();
-        const prevSrc = playbackSourcesRef.current[playKey];
-        if (prevSrc) prevSrc.stop();
-      } catch {}
-
-      try {
-        setPlayingAudio({ sentenceId, slotIndex });
-
-        // Build AudioContext graph
-        const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-        if (!AudioContextClass) {
-          throw new Error('AudioContext not supported');
-        }
-        const audioContext = new AudioContextClass();
-        const response = await fetch(recordingState.audioUrl);
-        const arrayBuffer = await response.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-        const source = audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        const analyser = audioContext.createAnalyser();
-        analyser.fftSize = 1024;
-        analyser.smoothingTimeConstant = 0.8;
-        source.connect(analyser);
-        analyser.connect(audioContext.destination);
-
-        audioContextsRef.current[playKey] = audioContext;
-        analysersRef.current[playKey] = analyser;
-        playbackSourcesRef.current[playKey] = source;
-
-        const buffer = new Uint8Array(analyser.frequencyBinCount);
-        const startTime = audioContext.currentTime;
-        const durationSec = Math.min(10, audioBuffer.duration);
-
-        const draw = () => {
-          const cv = waveformCanvasRefs.current[`${sentenceId}-3`];
-          const an = analysersRef.current[playKey];
-          if (!cv || !an) return;
-          const g = cv.getContext('2d');
-          if (!g) return;
-
-          const w = cv.width;
-          const h = cv.height;
-          g.fillStyle = '#f8fafc';
-          g.fillRect(0, 0, w, h);
-          g.strokeStyle = '#e5e7eb';
-          g.lineWidth = 1;
-          g.beginPath();
-          g.moveTo(0, h / 2);
-          g.lineTo(w, h / 2);
-          g.stroke();
-
-          // Progress position based on currentTime
-          const elapsed = audioContext.currentTime - startTime;
-          const progress = Math.min(elapsed / durationSec, 1);
-          const x = Math.floor(progress * w);
-
-          // Instantaneous amplitude bar
-          an.getByteTimeDomainData(buffer);
-          let sum = 0;
-          for (let i = 0; i < buffer.length; i++) {
-            const v = (buffer[i] - 128) / 128;
-            sum += v * v;
-          }
-          const rms = Math.sqrt(sum / buffer.length);
-          const barHeight = Math.max(2, Math.floor(rms * h));
-          const y = Math.floor(h / 2 - barHeight / 2);
-
-          g.fillStyle = '#0ea5e9';
-          g.fillRect(0, y, x, barHeight); // fill up to progress
-
-          if (progress < 1) {
-            const raf = requestAnimationFrame(draw);
-            animationFrameIdsRef.current[playKey] = raf;
-          }
-        };
-
-        source.start(0);
-        draw();
-
-        source.onended = () => {
-          setPlayingAudio(null);
-          const raf = animationFrameIdsRef.current[playKey];
-          if (raf) cancelAnimationFrame(raf);
-          delete animationFrameIdsRef.current[playKey];
-          if (audioContextsRef.current[playKey]) {
-            audioContextsRef.current[playKey].close().catch(() => undefined);
-            delete audioContextsRef.current[playKey];
-          }
-          delete analysersRef.current[playKey];
-          delete playbackSourcesRef.current[playKey];
-        };
-      } catch (e) {
-        console.error('Playback with visualization failed:', e);
-        updateRecordingState(sentenceId, slotIndex, { error: 'PLAYBACK_ERROR' });
-        setPlayingAudio(null);
-      }
-      return;
-    }
-
-    // Default playback for other slots
     const audio = new Audio(recordingState.audioUrl);
-    setPlayingAudio({ sentenceId, slotIndex });
     audio.play().catch(error => {
       console.error('Failed to play audio:', error);
       updateRecordingState(sentenceId, slotIndex, { error: 'PLAYBACK_ERROR' });
-      setPlayingAudio(null);
     });
-    audio.onended = () => setPlayingAudio(null);
   }, [getRecordingState, updateRecordingState]);
 
-  const handlePauseRecording = useCallback((sentenceId: number, slotIndex: number) => {
-    if (slotIndex === 3) {
-      const playKey = `${sentenceId}-${slotIndex}-play`;
-      const src = playbackSourcesRef.current[playKey];
-      if (src) {
-        try { src.stop(); } catch {}
-        delete playbackSourcesRef.current[playKey];
-      }
-      const raf = animationFrameIdsRef.current[playKey];
-      if (raf) {
-        cancelAnimationFrame(raf);
-        delete animationFrameIdsRef.current[playKey];
-      }
-      const ctx = audioContextsRef.current[playKey];
-      if (ctx) {
-        ctx.close().catch(() => undefined);
-        delete audioContextsRef.current[playKey];
-      }
-      delete analysersRef.current[playKey];
+  // Handle upload to server
+  const handleUploadRecording = useCallback(async (sentenceId: number, slotIndex: number) => {
+    const recordingState = getRecordingState(sentenceId, slotIndex);
+    if (!recordingState.audioBlob) return;
+
+    if (sessionStatus !== 'authenticated') {
+      updateRecordingState(sentenceId, slotIndex, {
+        error: 'NOT_AUTHENTICATED',
+      });
+      return;
     }
-    setPlayingAudio(null);
-  }, []);
+
+    try {
+      updateRecordingState(sentenceId, slotIndex, {
+        isUploading: true,
+        error: null,
+      });
+
+      const formData = new FormData();
+      formData.append('audio', recordingState.audioBlob, 'recording.webm');
+      formData.append('sentenceId', String(sentenceId));
+      formData.append('slotIndex', String(slotIndex));
+      formData.append('duration', String(recordingState.duration));
+
+      const response = await fetch('/api/audio/upload', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          console.error('Upload failed: unauthorized');
+          throw new Error('未登入或登入逾時，請重新登入後再試一次');
+        }
+
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Upload failed:', response.status, errorData);
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      const result = await response.json();
+      console.log('Upload successful:', result);
+
+      if (recordingState.audioBlob && recordingState.audioUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(recordingState.audioUrl);
+      }
+
+      updateRecordingState(sentenceId, slotIndex, {
+        isUploading: false,
+        audioUrl: result?.audioUrl ?? recordingState.audioUrl,
+        audioBlob: null,
+        fileSize: recordingState.audioBlob
+          ? recordingState.audioBlob.size
+          : recordingState.fileSize,
+        duration: typeof result?.duration === 'number' ? result.duration : recordingState.duration,
+      });
+    } catch (error) {
+      console.error('Upload failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'UPLOAD_ERROR';
+      updateRecordingState(sentenceId, slotIndex, {
+        isUploading: false,
+        error: errorMessage,
+      });
+    }
+  }, [getRecordingState, updateRecordingState, sessionStatus]);
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 md:py-12">
@@ -589,11 +484,26 @@ export default function PracticePage() {
         </p>
       </header>
 
+      {/* Instructions */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+        <h3 className="text-lg font-semibold text-blue-900 mb-2">使用說明</h3>
+        <ul className="text-sm text-blue-800 space-y-1">
+          <li>• 點擊「播放原音」聆聽標準發音</li>
+          <li>• 每個句子可以錄製 3 次，每次最多 10 秒</li>
+          <li>• 點擊圓形按鈕開始錄音，再點擊停止錄音</li>
+          <li>• 圓形按鈕背景動畫顯示剩餘時間</li>
+          <li>• 錄音完成後可以立即播放聽取</li>
+          <li>• 可以重新錄音覆蓋之前的錄音</li>
+          <li className="font-semibold text-blue-900">• ⚠️ 錄音完成後記得按「上傳」按鈕才會儲存到系統</li>
+        </ul>
+      </div>
+
       <section className="space-y-6">
         {sentences.map((sentence) => {
-          const hasAnyRecording = [0, 1, 2].some(slotIndex => 
-            getRecordingState(sentence.id, slotIndex).audioBlob
-          );
+          const hasAnyRecording = [0, 1, 2].some(slotIndex => {
+            const state = getRecordingState(sentence.id, slotIndex);
+            return Boolean(state.audioBlob || state.audioUrl);
+          });
 
           return (
             <article
@@ -602,74 +512,95 @@ export default function PracticePage() {
             >
               {/* Sentence Content */}
               <div className="mb-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 space-y-2">
-                    <p className="text-lg font-medium text-gray-900">{sentence.text}</p>
-                    <p className="text-sm text-gray-500">{sentence.translation}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handlePlay(sentence)}
-                    className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700"
-                  >
-                    <PlayIcon className="h-5 w-5" /> 播放原音
-                  </button>
-                </div>
-              </div>
-
-              {/* Single Recording Bar (Production Version) */}
-              <div className="relative mb-6 rounded-lg border border-gray-200 bg-white px-4 py-3">
-                {/* Collapse toggle button (^ / v) placed here; it controls legacy section below */}
-                <button
-                  type="button"
-                  onClick={() => setCollapsedSentences(prev => ({ ...prev, [sentence.id]: !prev[sentence.id] }))}
-                  className="absolute right-2 top-2 text-gray-500 hover:text-gray-700 text-xs"
-                  aria-label={collapsedSentences[sentence.id] ? '展開' : '收合'}
-                  title={collapsedSentences[sentence.id] ? '展開舊的錄音練習' : '收合舊的錄音練習'}
-                >
-                  {collapsedSentences[sentence.id] ? 'v' : '^'}
-                </button>
-
-                <div className="flex items-center gap-4">
-                  {/* Left: Single Recording Button (uses slotIndex 3 to avoid conflict) */}
-                  <div className="flex items-center gap-3">
-                    <RecordingButton
-                      slotIndex={3}
-                      sentenceId={sentence.id}
-                      recordingState={getRecordingState(sentence.id, 3)}
-                      onStartRecording={() => handleStartRecording(sentence.id, 3)}
-                      onStopRecording={() => handleStopRecording(sentence.id, 3)}
-                      onPlayRecording={() => handlePlayRecording(sentence.id, 3)}
-                      hasPlayedOriginal={playedSentences.has(sentence.id)}
-                      showDetails={false}
-                    />
-                  </div>
-
-                  {/* Right: Waveform container placeholder (to be implemented in step 2) */}
+                <div className="flex items-center justify-between gap-4">
                   <div className="flex-1">
-                    <canvas
-                      ref={(el) => { waveformCanvasRefs.current[`${sentence.id}-3`] = el; }}
-                      className="w-full rounded-md ring-1 ring-inset ring-gray-200 bg-gray-50"
-                      style={{ height: '80px' }}
-                      width={800}
-                      height={80}
-                    />
-                    <div className="mt-2">
-                      <AudioPlayer
-                        audioUrl={getRecordingState(sentence.id, 3).audioUrl}
-                        isPlaying={playingAudio?.sentenceId === sentence.id && playingAudio?.slotIndex === 3}
-                        onPlay={() => handlePlayRecording(sentence.id, 3)}
-                        onPause={() => handlePauseRecording(sentence.id, 3)}
-                        className="text-xs"
-                        durationOverrideSeconds={10}
-                      />
-                    </div>
+                    <p className="text-lg font-medium text-gray-900">{sentence.text}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {/* Future Feature: Square Recording Button - Currently Disabled */}
+                    {/*
+                    {(() => {
+                      const recordingState = getRecordingState(sentence.id, 3);
+                      const isRecording = recordingState.isRecording;
+                      const isUploading = recordingState.isUploading;
+                      const hasRecording = recordingState.audioBlob;
+
+                      return (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isRecording) {
+                                handleStopRecording(sentence.id, 3);
+                              } else {
+                                handleStartRecording(sentence.id, 3);
+                              }
+                            }}
+                            disabled={isUploading}
+                            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition ${
+                              isRecording
+                                ? 'bg-red-600 hover:bg-red-700'
+                                : 'bg-green-600 hover:bg-green-700'
+                            } ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            {isRecording ? (
+                              <>
+                                <StopIcon className="h-5 w-5" /> 停止錄音
+                              </>
+                            ) : (
+                              <>
+                                <MicrophoneIcon className="h-5 w-5" /> {hasRecording ? '重新錄音' : '開始錄音'}
+                              </>
+                            )}
+                          </button>
+
+                          {hasRecording && !isRecording && (
+                            <button
+                              type="button"
+                              onClick={() => handleUploadRecording(sentence.id, 3)}
+                              disabled={isUploading}
+                              className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition ${
+                                isUploading
+                                  ? 'bg-gray-400 cursor-not-allowed'
+                                  : 'bg-blue-600 hover:bg-blue-700'
+                              }`}
+                            >
+                              {isUploading ? (
+                                <>
+                                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  上傳中...
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                                  </svg>
+                                  確認上傳
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </>
+                      );
+                    })()}
+                    */}
+                    {/* Play Original Audio Button */}
+                    <button
+                      type="button"
+                      onClick={() => handlePlay(sentence)}
+                      className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700"
+                    >
+                      <PlayIcon className="h-5 w-5" /> 播放原音
+                    </button>
                   </div>
                 </div>
               </div>
 
-              {/* Recording Section (legacy three-button block). To hide permanently, comment out this entire <div> ... </div> block. */}
-              <div className={`border-t pt-6 ${collapsedSentences[sentence.id] ? 'hidden' : ''}`}>
+              {/* Recording Section - Three recording attempts */}
+              <div className="border-t pt-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base font-medium text-gray-900">錄音練習</h3>
                   {hasAnyRecording && (
@@ -691,16 +622,17 @@ export default function PracticePage() {
                             錄音 {slotIndex + 1}
                           </span>
                         </div>
-                        
-                         <RecordingButton
-                           slotIndex={slotIndex}
-                           sentenceId={sentence.id}
-                           recordingState={recordingState}
-                           onStartRecording={() => handleStartRecording(sentence.id, slotIndex)}
-                           onStopRecording={() => handleStopRecording(sentence.id, slotIndex)}
-                           onPlayRecording={() => handlePlayRecording(sentence.id, slotIndex)}
-                           hasPlayedOriginal={playedSentences.has(sentence.id)}
-                         />
+
+                        <RecordingButton
+                          slotIndex={slotIndex}
+                          sentenceId={sentence.id}
+                          recordingState={recordingState}
+                          onStartRecording={() => handleStartRecording(sentence.id, slotIndex)}
+                          onStopRecording={() => handleStopRecording(sentence.id, slotIndex)}
+                          onPlayRecording={() => handlePlayRecording(sentence.id, slotIndex)}
+                          onUploadRecording={() => handleUploadRecording(sentence.id, slotIndex)}
+                          hasPlayedOriginal={playedSentences.has(sentence.id)}
+                        />
                       </div>
                     );
                   })}
@@ -711,7 +643,8 @@ export default function PracticePage() {
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <div className="flex gap-1">
                       {[0, 1, 2].map((slotIndex) => {
-                        const hasRecording = getRecordingState(sentence.id, slotIndex).audioBlob;
+                        const slotState = getRecordingState(sentence.id, slotIndex);
+                        const hasRecording = Boolean(slotState.audioBlob || slotState.audioUrl);
                         return (
                           <div
                             key={slotIndex}
@@ -723,9 +656,10 @@ export default function PracticePage() {
                       })}
                     </div>
                     <span>
-                      {[0, 1, 2].filter(slotIndex => 
-                        getRecordingState(sentence.id, slotIndex).audioBlob
-                      ).length} / 3 完成
+                      {[0, 1, 2].filter(slotIndex => {
+                        const state = getRecordingState(sentence.id, slotIndex);
+                        return Boolean(state.audioBlob || state.audioUrl);
+                      }).length} / 3 完成
                     </span>
                   </div>
                 </div>
@@ -734,19 +668,6 @@ export default function PracticePage() {
           );
         })}
       </section>
-
-      {/* Instructions */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-blue-900 mb-2">使用說明</h3>
-        <ul className="text-sm text-blue-800 space-y-1">
-          <li>• 點擊「播放原音」聆聽標準發音</li>
-          <li>• 每個句子可以錄製 3 次，每次最多 10 秒</li>
-          <li>• 點擊圓形按鈕開始錄音，再點擊停止錄音</li>
-          <li>• 圓形按鈕背景動畫顯示剩餘時間</li>
-          <li>• 錄音完成後可以立即播放聽取</li>
-          <li>• 可以重新錄音覆蓋之前的錄音</li>
-        </ul>
-      </div>
     </div>
   );
 }

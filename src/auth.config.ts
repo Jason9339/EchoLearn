@@ -10,6 +10,11 @@ export const authConfig = {
       const { pathname } = nextUrl;
       const isOnDashboard = pathname.startsWith('/dashboard');
       const isAuthPage = pathname === '/login' || pathname === '/register';
+      const isApiRoute = pathname.startsWith('/api/');
+
+      if (isApiRoute) {
+        return true;
+      }
 
       if (isOnDashboard) return isLoggedIn;
       if (isAuthPage) return true; // Allow access to login and register pages

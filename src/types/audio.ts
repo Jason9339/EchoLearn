@@ -16,6 +16,8 @@ export interface RecordingState {
   isUploading: boolean;
   /** Error message if any */
   error: string | null;
+  /** File size in bytes (if known) */
+  fileSize: number | null;
 }
 
 export interface UseAudioRecorderReturn {
@@ -69,6 +71,8 @@ export interface RecordingButtonProps {
   onStopRecording: () => void;
   /** Play recording callback */
   onPlayRecording: () => void;
+  /** Upload recording callback */
+  onUploadRecording?: () => void;
   /** Whether button is disabled */
   disabled?: boolean;
   /** Whether the sentence has been played */

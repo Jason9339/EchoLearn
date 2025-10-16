@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# uploaded audio files
+/public/uploads/audio/*
+!/public/uploads/audio/.gitkeep

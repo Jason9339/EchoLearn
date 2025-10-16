@@ -131,7 +131,8 @@ export function generateAudioFilename(
   slotIndex: number
 ): string {
   const timestamp = Date.now();
-  return `${userId}_${sentenceId}_${slotIndex}_${timestamp}.webm`;
+  const safeUserId = sanitizePathComponent(userId);
+  return `${safeUserId}_${sentenceId}_${slotIndex}_${timestamp}.webm`;
 }
 
 /**
@@ -149,7 +150,16 @@ export function generateLabeledAudioFilename(
   label: 'official' | 'test'
 ): string {
   const timestamp = Date.now();
-  return `${userId}_${sentenceId}_${label}-${slotIndex}_${timestamp}.webm`;
+  const safeUserId = sanitizePathComponent(userId);
+  return `${safeUserId}_${sentenceId}_${label}-${slotIndex}_${timestamp}.webm`;
+}
+
+/**
+ * Sanitize a string so it can safely be used as part of a filesystem path.
+ * Only letters, numbers, underscores and hyphens are kept; others become '_'.
+ */
+export function sanitizePathComponent(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]/g, '_');
 }
 
 /**
@@ -187,6 +197,8 @@ export function getAudioErrorMessage(error: Error | string): string {
       return '上傳失敗，請檢查網路連線';
     case 'PLAY_FIRST':
       return '請先播放原音';
+    case 'NOT_AUTHENTICATED':
+      return '需要登入才能上傳錄音';
     default:
       return '發生未知錯誤，請重試';
   }

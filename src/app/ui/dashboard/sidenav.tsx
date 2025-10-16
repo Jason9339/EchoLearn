@@ -13,6 +13,7 @@ export default function SideNav() {
           width={50}
           height={50}
           className="rounded-lg"
+          priority
         />
         <p className="text-lg font-bold uppercase tracking-wide text-sky-600">
           EchoLearn

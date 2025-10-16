@@ -18,7 +18,7 @@ async function getUser(email: string): Promise<User | undefined> {
   }
 }
 
-export const { auth, signIn, signOut } = NextAuth({
+export const { auth, signIn, signOut, handlers } = NextAuth({
   ...authConfig,
   // 可選：明確聲明使用 JWT 策略（v5 預設就是 JWT）
   session: { strategy: 'jwt' },

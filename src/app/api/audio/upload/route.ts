@@ -17,7 +17,7 @@ const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 export const POST = auth(async function POST(request) {
   const session = request.auth;
 
-  let userId = session?.user?.id ?? (session as any)?.token?.sub ?? null;
+  let userId = session?.user?.id ?? null;
 
   if (!userId && session?.user?.email) {
     try {

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { PlayIcon, MicrophoneIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/outline';
 import { courses, defaultPracticeCourseId, practiceSentences } from '@/app/lib/placeholder-data';
 import type { PracticeSentence } from '@/app/lib/definitions';
@@ -11,6 +11,7 @@ const fallbackCourseTitle = '口說練習';
 
 export default function PracticePage() {
   const [recordingId, setRecordingId] = useState<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   const currentCourse = courses.find((course) => course.id === courseId);
   const sentences: PracticeSentence[] = practiceSentences[courseId] ?? [];
@@ -18,7 +19,11 @@ export default function PracticePage() {
   const handlePlay = (sentence: PracticeSentence) => {
     if (typeof window === 'undefined') return;
 
-    if ('speechSynthesis' in window) {
+    if (sentence.audioSrc && audioRef.current) {
+      audioRef.current.src = sentence.audioSrc;
+      console.log(audioRef.current.src);
+      audioRef.current.play();
+    } else if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(sentence.text);
       window.speechSynthesis.speak(utterance);
@@ -31,11 +36,12 @@ export default function PracticePage() {
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 md:py-12">
+      <audio ref={audioRef} />
       <header className="rounded-xl bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-sm text-gray-500">
-              {currentCourse ? `${currentCourse.title} · 假資料 Demo` : 'EchoLearn · 假資料 Demo'}
+              {currentCourse ? currentCourse.title : 'EchoLearn'}
             </p>
             <h1 className="mt-1 text-2xl font-semibold text-gray-900">
               {currentCourse?.title ?? fallbackCourseTitle}

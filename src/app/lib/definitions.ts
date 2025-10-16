@@ -12,6 +12,7 @@ export type PracticeSentence = {
   id: number;
   text: string;
   translation: string;
+  audioSrc?: string;
 };
 
 export type User = {

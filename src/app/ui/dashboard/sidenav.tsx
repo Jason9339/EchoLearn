@@ -1,12 +1,20 @@
 import NavLinks from '@/app/ui/dashboard/nav-links';
 import { signOut } from '@/auth';
 import { PowerIcon } from '@heroicons/react/24/outline';
+import Image from 'next/image';
 
 export default function SideNav() {
   return (
     <aside className="flex h-full flex-col bg-white px-3 py-6 shadow-sm">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-widest text-sky-600">
+      <div className="mb-4 flex items-center gap-3">
+        <Image
+          src="/image.png"
+          alt="EchoLearn Logo"
+          width={50}
+          height={50}
+          className="rounded-lg"
+        />
+        <p className="text-lg font-bold uppercase tracking-wide text-sky-600">
           EchoLearn
         </p>
       </div>

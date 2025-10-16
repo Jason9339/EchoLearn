@@ -24,7 +24,8 @@ export default async function DashboardPage() {
 
   const user = await getUser(session.user.email);
 
-  const isInfoSubmitted = user?.student_id && user?.consent;
+  // Check if user has completed all required information
+  const isInfoSubmitted = user?.student_id && user?.gender && user?.age && user?.consent;
 
   return (
     <div>

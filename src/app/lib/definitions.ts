@@ -20,5 +20,7 @@ export type User = {
   email: string;
   password: string;
   student_id?: string;
+  gender?: string;
+  age?: number;
   consent?: boolean;
 };

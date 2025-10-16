@@ -92,20 +92,28 @@ export async function registerAction(
   }
 }
 
-export async function updateUserInfo(studentId: string, consent: boolean) {
+export async function updateUserInfo(
+  studentId: string,
+  gender: string,
+  age: number,
+  consent: boolean
+) {
   const session = await auth();
   if (!session?.user?.email) {
     return { message: 'Unauthorized' };
   }
 
-  if (!studentId || consent === undefined) {
+  if (!studentId || !gender || !age || consent === undefined) {
     return { message: 'Missing required fields' };
   }
 
   try {
     await sql`
       UPDATE users
-      SET student_id = ${studentId}
+      SET student_id = ${studentId},
+          gender = ${gender},
+          age = ${age},
+          consent = ${consent}
       WHERE email = ${session.user.email}
     `;
 

@@ -49,7 +49,7 @@ export async function registerAction(
     if (!parsed.success) return 'Invalid form data.';
 
     const name = parsed.data.name.trim();
-    const email = parsed.data.email.toLowerCase().trim();
+    const email = parsed.data.email.trim();
     const password = parsed.data.password;
 
     // Check if email already exists

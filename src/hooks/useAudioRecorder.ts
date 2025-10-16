@@ -15,6 +15,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     audioUrl: null,
     isUploading: false,
     error: null,
+    fileSize: null,
   });
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -98,6 +99,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
           audioBlob,
           audioUrl,
           duration: Date.now() - startTimeRef.current,
+          fileSize: audioBlob.size,
         }));
 
         cleanup();
@@ -123,6 +125,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
         ...prev,
         isRecording: true,
         duration: 0,
+        fileSize: null,
       }));
 
       // Start duration tracking
@@ -131,6 +134,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
         setRecordingState(prev => ({
           ...prev,
           duration: currentDuration,
+          fileSize: prev.fileSize,
         }));
       }, 100);
 

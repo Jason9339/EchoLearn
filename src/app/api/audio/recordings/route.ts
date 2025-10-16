@@ -8,8 +8,8 @@ const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
  * Get all recordings for the current user
  * Returns JSON: { success, recordings: [{ id, sentenceId, slotIndex, audioUrl, duration, createdAt }] }
  */
-export const GET = auth(async function GET(request) {
-  const session = request.auth;
+export async function GET(): Promise<Response> {
+  const session = await auth();
 
   let userId = session?.user?.id ?? null;
 
@@ -67,4 +67,4 @@ export const GET = auth(async function GET(request) {
     console.error('Get recordings error:', e);
     return Response.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
   }
-});
+}

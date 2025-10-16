@@ -14,8 +14,8 @@ const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
  *
  * Saves audio file to local storage and persists metadata to PostgreSQL
  */
-export const POST = auth(async function POST(request) {
-  const session = request.auth;
+export async function POST(request: Request): Promise<Response> {
+  const session = await auth();
 
   let userId = session?.user?.id ?? null;
 
@@ -113,4 +113,4 @@ export const POST = auth(async function POST(request) {
     console.error('Upload error:', error);
     return Response.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
   }
-});
+}

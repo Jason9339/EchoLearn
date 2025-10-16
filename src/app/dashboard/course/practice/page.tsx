@@ -1,12 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { PlayIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/outline';
 import { courses, defaultPracticeCourseId, practiceSentences } from '@/app/lib/placeholder-data';
 import type { PracticeSentence } from '@/app/lib/definitions';
 import type { RecordingState } from '@/types/audio';
-import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import RecordingButton from '@/components/RecordingButton';
 
 const courseId = defaultPracticeCourseId;
@@ -22,11 +21,35 @@ type SentenceRecordingStates = {
 export default function PracticePage() {
   const [recordingStates, setRecordingStates] = useState<SentenceRecordingStates>({});
   const [playingAudio, setPlayingAudio] = useState<{ sentenceId: number; slotIndex: number } | null>(null);
-  const [mediaRecorders, setMediaRecorders] = useState<Record<string, MediaRecorder>>({});
   const [playedSentences, setPlayedSentences] = useState<Set<number>>(new Set());
+  
+  // Use refs to store MediaRecorder instances and cleanup functions
+  const mediaRecordersRef = useRef<Record<string, MediaRecorder>>({});
+  const cleanupFunctionsRef = useRef<Record<string, () => void>>({});
 
   const currentCourse = courses.find((course) => course.id === courseId);
   const sentences: PracticeSentence[] = practiceSentences[courseId] ?? [];
+
+  // Cleanup effect for component unmount
+  useEffect(() => {
+    return () => {
+      // Clean up all active MediaRecorders
+      Object.values(mediaRecordersRef.current).forEach(recorder => {
+        if (recorder.state === 'recording') {
+          recorder.stop();
+        }
+      });
+      
+      // Call all cleanup functions
+      Object.values(cleanupFunctionsRef.current).forEach(cleanup => {
+        cleanup();
+      });
+      
+      // Clear refs
+      mediaRecordersRef.current = {};
+      cleanupFunctionsRef.current = {};
+    };
+  }, []);
 
   // Initialize recording state for a sentence slot
   const initializeRecordingState = useCallback((sentenceId: number, slotIndex: number): RecordingState => {
@@ -49,12 +72,13 @@ export default function PracticePage() {
   const updateRecordingState = useCallback((sentenceId: number, slotIndex: number, updates: Partial<RecordingState>) => {
     console.log('updateRecordingState called:', { sentenceId, slotIndex, updates });
     setRecordingStates(prev => {
+      const currentState = prev[sentenceId]?.[slotIndex] || initializeRecordingState(sentenceId, slotIndex);
       const newState = {
         ...prev,
         [sentenceId]: {
           ...prev[sentenceId],
           [slotIndex]: {
-            ...getRecordingState(sentenceId, slotIndex),
+            ...currentState,
             ...updates,
           },
         },
@@ -62,7 +86,7 @@ export default function PracticePage() {
       console.log('New recording state:', newState);
       return newState;
     });
-  }, [getRecordingState]);
+  }, [initializeRecordingState]);
 
   // Handle TTS playback
   const handlePlay = (sentence: PracticeSentence) => {
@@ -181,8 +205,12 @@ export default function PracticePage() {
           duration: Date.now() - startTime,
         });
 
-        // Clean up stream
-        stream.getTracks().forEach(track => track.stop());
+        // Call cleanup function
+        const cleanup = cleanupFunctionsRef.current[recorderKey];
+        if (cleanup) {
+          cleanup();
+        }
+        
         console.log('Recording completed successfully');
       };
 
@@ -193,7 +221,12 @@ export default function PracticePage() {
           error: 'RECORDING_ERROR',
           isRecording: false,
         });
-        stream.getTracks().forEach(track => track.stop());
+        
+        // Call cleanup function
+        const cleanup = cleanupFunctionsRef.current[recorderKey];
+        if (cleanup) {
+          cleanup();
+        }
       };
 
       // Start recording
@@ -201,13 +234,10 @@ export default function PracticePage() {
       mediaRecorder.start(100);
       console.log('MediaRecorder started, state:', mediaRecorder.state);
       
-      // Store MediaRecorder reference
+      // Store MediaRecorder reference using ref
       const recorderKey = `${sentenceId}-${slotIndex}`;
       console.log('Storing MediaRecorder with key:', recorderKey);
-      setMediaRecorders(prev => ({
-        ...prev,
-        [recorderKey]: mediaRecorder
-      }));
+      mediaRecordersRef.current[recorderKey] = mediaRecorder;
       
       // Update duration every 100ms
       const durationInterval = setInterval(() => {
@@ -226,9 +256,17 @@ export default function PracticePage() {
         clearInterval(durationInterval);
       }, 10000);
 
-      // Store references for cleanup
-      (mediaRecorder as any)._durationInterval = durationInterval;
-      (mediaRecorder as any)._autoStopTimeout = autoStopTimeout;
+      // Create cleanup function
+      const cleanup = () => {
+        clearInterval(durationInterval);
+        clearTimeout(autoStopTimeout);
+        stream.getTracks().forEach(track => track.stop());
+        delete mediaRecordersRef.current[recorderKey];
+        delete cleanupFunctionsRef.current[recorderKey];
+      };
+      
+      // Store cleanup function
+      cleanupFunctionsRef.current[recorderKey] = cleanup;
       
       console.log('Recording setup completed successfully');
 
@@ -256,32 +294,24 @@ export default function PracticePage() {
   // Handle recording stop for a specific slot
   const handleStopRecording = useCallback((sentenceId: number, slotIndex: number) => {
     const recorderKey = `${sentenceId}-${slotIndex}`;
-    const mediaRecorder = mediaRecorders[recorderKey];
+    const mediaRecorder = mediaRecordersRef.current[recorderKey];
+    
+    console.log('handleStopRecording called:', { sentenceId, slotIndex, recorderKey, mediaRecorderState: mediaRecorder?.state });
     
     if (mediaRecorder && mediaRecorder.state === 'recording') {
+      console.log('Stopping MediaRecorder...');
       // Stop the MediaRecorder
       mediaRecorder.stop();
       
-      // Clean up duration interval
-      const durationInterval = (mediaRecorder as any)._durationInterval;
-      if (durationInterval) {
-        clearInterval(durationInterval);
+      // Call cleanup function
+      const cleanup = cleanupFunctionsRef.current[recorderKey];
+      if (cleanup) {
+        cleanup();
       }
-      
-      // Clean up auto-stop timeout
-      const autoStopTimeout = (mediaRecorder as any)._autoStopTimeout;
-      if (autoStopTimeout) {
-        clearTimeout(autoStopTimeout);
-      }
-      
-      // Remove from state
-      setMediaRecorders(prev => {
-        const newRecorders = { ...prev };
-        delete newRecorders[recorderKey];
-        return newRecorders;
-      });
+    } else {
+      console.log('No active MediaRecorder found or not in recording state');
     }
-  }, [mediaRecorders]);
+  }, []);
 
   // Handle audio playback for a specific slot
   const handlePlayRecording = useCallback((sentenceId: number, slotIndex: number) => {

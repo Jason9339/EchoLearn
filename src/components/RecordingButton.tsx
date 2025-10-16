@@ -19,21 +19,10 @@ export default function RecordingButton({
   disabled = false,
   hasPlayedOriginal = false,
 }: RecordingButtonProps) {
+  // Check if this slot can start recording
+  const canStartRecording = hasPlayedOriginal && !recordingState.audioBlob && !recordingState.isRecording && !recordingState.isUploading;
+
   const getButtonState = (): ButtonState => {
-    console.log('getButtonState called:', {
-      slotIndex,
-      sentenceId,
-      disabled,
-      recordingState: {
-        isRecording: recordingState.isRecording,
-        isUploading: recordingState.isUploading,
-        audioBlob: !!recordingState.audioBlob,
-        error: recordingState.error
-      },
-      canStartRecording,
-      hasPlayedOriginal
-    });
-    
     if (disabled) return 'disabled';
     if (recordingState.isUploading) return 'uploading';
     if (recordingState.isRecording) return 'recording';
@@ -41,9 +30,6 @@ export default function RecordingButton({
     if (canStartRecording) return 'ready';
     return 'idle';
   };
-
-  // Check if this is the first slot and can start recording
-  const canStartRecording = slotIndex === 0 && hasPlayedOriginal && !recordingState.audioBlob && !recordingState.isRecording && !recordingState.isUploading;
 
   const getButtonText = (): string => {
     const state = getButtonState();
@@ -128,7 +114,7 @@ export default function RecordingButton({
         <button
           type="button"
           onClick={handleClick}
-          disabled={disabled || recordingState.isUploading}
+          disabled={disabled || (recordingState.isUploading && !recordingState.isRecording)}
           className={`
             relative w-16 h-16 rounded-full flex items-center justify-center
             transition-all duration-300 ease-in-out transform hover:scale-105
@@ -151,7 +137,7 @@ export default function RecordingButton({
         >
           {/* Animated Background Ring for Recording State */}
           {getButtonState() === 'recording' && (
-            <div className="absolute inset-0 rounded-full">
+            <div className="absolute inset-0 rounded-full pointer-events-none">
               <div className="absolute inset-0 rounded-full border-4 border-red-300 animate-ping opacity-75"></div>
               <div className="absolute inset-0 rounded-full border-2 border-red-200 animate-pulse"></div>
             </div>
@@ -213,7 +199,7 @@ export default function RecordingButton({
 
         {/* Recording Progress Ring */}
         {getButtonState() === 'recording' && (
-          <div className="absolute inset-0 rounded-full">
+          <div className="absolute inset-0 rounded-full pointer-events-none">
             <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 64 64">
               <circle
                 cx="32"

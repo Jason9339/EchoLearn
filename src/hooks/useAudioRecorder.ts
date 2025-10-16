@@ -265,6 +265,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       audioUrl: null,
       isUploading: false,
       error: null,
+      fileSize: null,
     });
 
     cleanup();

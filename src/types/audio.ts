@@ -106,3 +106,23 @@ export interface DeleteResponse {
   success: boolean;
   error?: string;
 }
+
+/**
+ * Recording slot semantics
+ * - OFFICIAL_SLOT: the single official submission slot (index 3)
+ * - TEST_SLOTS: three testing slots (indexes 0,1,2)
+ */
+export const OFFICIAL_SLOT: number = 3;
+export const TEST_SLOTS: readonly number[] = [0, 1, 2] as const;
+
+/** Label for slot semantics */
+export type SlotLabel = 'official' | 'test';
+
+/**
+ * Get semantic label for a given slot index.
+ * @param slotIndex Slot index
+ * @returns 'official' for OFFICIAL_SLOT; otherwise 'test'
+ */
+export function getSlotLabel(slotIndex: number): SlotLabel {
+  return slotIndex === OFFICIAL_SLOT ? 'official' : 'test';
+}

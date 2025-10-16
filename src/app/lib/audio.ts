@@ -135,6 +135,24 @@ export function generateAudioFilename(
 }
 
 /**
+ * Generate labeled filename with semantic label (official/test)
+ * @param userId User ID
+ * @param sentenceId Sentence ID
+ * @param slotIndex Slot index
+ * @param label Semantic label: 'official' | 'test'
+ * @returns Filename with label
+ */
+export function generateLabeledAudioFilename(
+  userId: string,
+  sentenceId: number,
+  slotIndex: number,
+  label: 'official' | 'test'
+): string {
+  const timestamp = Date.now();
+  return `${userId}_${sentenceId}_${label}-${slotIndex}_${timestamp}.webm`;
+}
+
+/**
  * Get error message for audio recording errors
  * @param error - Error object or error name
  * @returns User-friendly error message

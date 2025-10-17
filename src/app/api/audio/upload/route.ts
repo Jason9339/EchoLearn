@@ -1,9 +1,8 @@
 import { auth } from '@/auth';
 import { generateLabeledAudioFilename, sanitizePathComponent, validateAudioFile } from '@/app/lib/audio';
 import { getSlotLabel } from '@/types/audio';
+import { getSupabaseAdmin } from '@/app/lib/supabase';
 import postgres from 'postgres';
-import { writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
 
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
@@ -12,7 +11,7 @@ const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
  * Accepts multipart/form-data: audio (file), sentenceId, slotIndex
  * Returns JSON: { success, recordingId, audioUrl, duration }
  *
- * Saves audio file to local storage and persists metadata to PostgreSQL
+ * Uploads audio file to Supabase Storage and persists metadata to PostgreSQL
  */
 export async function POST(request: Request): Promise<Response> {
   const session = await auth();
@@ -73,17 +72,31 @@ export async function POST(request: Request): Promise<Response> {
     const label = getSlotLabel(slotIndex); // 'official' | 'test'
     const filename = generateLabeledAudioFilename(normalizedUserId, sentenceId, slotIndex, label);
 
-    // Save file to local storage
-    const uploadDir = join(process.cwd(), 'public', 'uploads', 'audio', safeUserId, String(sentenceId));
-    await mkdir(uploadDir, { recursive: true });
+    // Upload file to Supabase Storage
+    const supabase = getSupabaseAdmin();
+    const storagePath = `audio/${safeUserId}/${sentenceId}/${filename}`;
 
-    const filePath = join(uploadDir, filename);
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    await writeFile(filePath, buffer);
 
-    // Public URL path for accessing the file
-    const audioUrl = `/uploads/audio/${safeUserId}/${sentenceId}/${filename}`;
+    const { error: uploadError } = await supabase.storage
+      .from('recordings')
+      .upload(storagePath, buffer, {
+        contentType: 'audio/webm',
+        upsert: true, // Replace if exists
+      });
+
+    if (uploadError) {
+      console.error('Supabase upload error:', uploadError);
+      return Response.json({ success: false, error: 'Failed to upload audio file' }, { status: 500 });
+    }
+
+    // Get public URL for the uploaded file
+    const { data: urlData } = supabase.storage
+      .from('recordings')
+      .getPublicUrl(storagePath);
+
+    const audioUrl = urlData.publicUrl;
 
     // Optional duration (ms) if client sends it; else approximate 0 for now
     const duration = typeof durationRaw === 'string' ? Number.parseInt(durationRaw, 10) : 0;

@@ -1,6 +1,6 @@
 'use client';
 
-import { MicrophoneIcon, StopIcon } from '@heroicons/react/24/outline';
+import { MicrophoneIcon, StopIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import AudioPlayer from '@/components/AudioPlayer';
 import type { RecordingButtonProps, ButtonState } from '@/types/audio';
 import { getAudioErrorMessage } from '@/app/lib/audio';
@@ -16,18 +16,25 @@ export default function RecordingButton({
   onStartRecording,
   onStopRecording,
   onPlayRecording,
+  onUploadRecording,
   disabled = false,
   hasPlayedOriginal = false,
   showDetails = true,
 }: RecordingButtonProps) {
+  const hasRecording = Boolean(recordingState.audioBlob || recordingState.audioUrl);
+
   // Check if this slot can start recording
-  const canStartRecording = hasPlayedOriginal && !recordingState.audioBlob && !recordingState.isRecording && !recordingState.isUploading;
+  const canStartRecording =
+    hasPlayedOriginal &&
+    !recordingState.isRecording &&
+    !recordingState.isUploading &&
+    !hasRecording;
 
   const getButtonState = (): ButtonState => {
     if (disabled) return 'disabled';
     if (recordingState.isUploading) return 'uploading';
     if (recordingState.isRecording) return 'recording';
-    if (recordingState.audioBlob) return 'recorded';
+    if (hasRecording) return 'recorded';
     if (canStartRecording) return 'ready';
     return 'idle';
   };
@@ -81,6 +88,7 @@ export default function RecordingButton({
       recordingState: {
         isRecording: recordingState.isRecording,
         audioBlob: !!recordingState.audioBlob,
+        audioUrl: !!recordingState.audioUrl,
         isUploading: recordingState.isUploading,
         error: recordingState.error
       }
@@ -107,6 +115,20 @@ export default function RecordingButton({
   };
 
   const isPlaying = false; // This would be managed by parent component
+  const buttonState = getButtonState();
+  const displayFileSize =
+    recordingState.audioBlob?.size ?? recordingState.fileSize ?? null;
+  const showUploadSuccess =
+    !recordingState.audioBlob &&
+    !!recordingState.audioUrl &&
+    !recordingState.isUploading;
+
+  const handleUploadClick = () => {
+    if (!onUploadRecording || recordingState.isUploading || !recordingState.audioBlob) {
+      return;
+    }
+    onUploadRecording();
+  };
 
   return (
     <div className="flex flex-col items-center space-y-3">
@@ -120,15 +142,15 @@ export default function RecordingButton({
             relative w-16 h-16 rounded-full flex items-center justify-center
             transition-all duration-300 ease-in-out transform hover:scale-105
             focus:outline-none focus:ring-4 focus:ring-opacity-50
-            ${getButtonState() === 'recording' 
+            ${buttonState === 'recording' 
               ? 'bg-red-500 hover:bg-red-600 focus:ring-red-300 text-white' 
-              : getButtonState() === 'recorded'
+              : buttonState === 'recorded'
               ? 'bg-green-500 hover:bg-green-600 focus:ring-green-300 text-white'
-              : getButtonState() === 'uploading'
+              : buttonState === 'uploading'
               ? 'bg-blue-500 hover:bg-blue-600 focus:ring-blue-300 text-white'
-              : getButtonState() === 'ready'
+              : buttonState === 'ready'
               ? 'bg-blue-500 hover:bg-blue-600 focus:ring-blue-300 text-white'
-              : getButtonState() === 'disabled'
+              : buttonState === 'disabled'
               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
               : 'bg-gray-100 hover:bg-gray-200 focus:ring-gray-300 text-gray-700'
             }
@@ -137,7 +159,7 @@ export default function RecordingButton({
           aria-label={getButtonText()}
         >
           {/* Animated Background Ring for Recording State */}
-          {getButtonState() === 'recording' && (
+          {buttonState === 'recording' && (
             <div className="absolute inset-0 rounded-full pointer-events-none">
               <div className="absolute inset-0 rounded-full border-4 border-red-300 animate-ping opacity-75"></div>
               <div className="absolute inset-0 rounded-full border-2 border-red-200 animate-pulse"></div>
@@ -151,7 +173,7 @@ export default function RecordingButton({
         </button>
 
         {/* Message Overlay - Priority Order: recording > ready > error */}
-        {getButtonState() === 'recording' && (
+        {buttonState === 'recording' && (
           <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 z-20">
             <div className="bg-red-500 text-white text-xs px-3 py-2 rounded-lg shadow-lg whitespace-nowrap animate-pulse">
               <div className="flex items-center gap-1">
@@ -167,7 +189,7 @@ export default function RecordingButton({
         )}
 
         {/* Warning Message Overlay - Only show if not recording and not ready */}
-        {recordingState.error === 'PLAY_FIRST' && getButtonState() !== 'recording' && getButtonState() !== 'ready' && (
+        {recordingState.error === 'PLAY_FIRST' && buttonState !== 'recording' && buttonState !== 'ready' && (
           <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 z-20">
             <div className="bg-red-500 text-white text-xs px-3 py-2 rounded-lg shadow-lg whitespace-nowrap animate-pulse">
               <div className="flex items-center gap-1">
@@ -183,7 +205,7 @@ export default function RecordingButton({
         )}
 
         {/* Recording Progress Ring */}
-        {getButtonState() === 'recording' && (
+        {buttonState === 'recording' && (
           <div className="absolute inset-0 rounded-full pointer-events-none">
             <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 64 64">
               <circle
@@ -231,24 +253,61 @@ export default function RecordingButton({
         </div>
       )}
 
-      {/* Audio Player */}
-      {showDetails && recordingState.audioBlob && !recordingState.isRecording && (
-        <div className="w-full max-w-48">
-          <AudioPlayer
-            audioUrl={recordingState.audioUrl}
-            isPlaying={isPlaying}
-            onPlay={onPlayRecording}
-            onPause={() => {}}
-            className="text-xs"
-          />
-        </div>
-      )}
+      {/* Audio Player and Upload Button Row */}
+      {showDetails && hasRecording && !recordingState.isRecording && (
+        <div className="w-full max-w-48 flex flex-col items-center gap-2">
+          <div className="flex items-center justify-center gap-2">
+            <AudioPlayer
+              audioUrl={recordingState.audioUrl}
+              isPlaying={isPlaying}
+              onPlay={onPlayRecording}
+              onPause={() => {}}
+              className="text-xs"
+            />
+            {onUploadRecording && (
+              <button
+                type="button"
+                onClick={handleUploadClick}
+                disabled={recordingState.isUploading || !recordingState.audioBlob}
+                className={`inline-flex items-center gap-2 px-3 py-1 text-xs font-medium rounded transition-colors ${
+                  recordingState.isUploading
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : recordingState.audioBlob
+                      ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                      : 'bg-green-500 text-white cursor-default'
+                }`}
+              >
+                {recordingState.isUploading ? (
+                  <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : recordingState.audioBlob ? (
+                  <>
+                    <svg className="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                    <span>上傳錄音</span>
+                  </>
+                ) : showUploadSuccess ? (
+                  <>
+                    <CheckCircleIcon className="h-3 w-3" />
+                    <span>上傳成功</span>
+                  </>
+                ) : (
+                  <span>上傳錄音</span>
+                )}
+              </button>
+            )}
+          </div>
 
-      {/* Recording Info */}
-      {showDetails && recordingState.audioBlob && !recordingState.isRecording && (
-        <div className="text-xs text-gray-500 text-center">
-          <div>時長: {(recordingState.duration / 1000).toFixed(1)}s</div>
-          <div>大小: {(recordingState.audioBlob.size / 1024).toFixed(1)}KB</div>
+          {/* Recording Info */}
+          <div className="text-xs text-gray-500 text-center">
+            <div>時長: {(recordingState.duration / 1000).toFixed(1)}s</div>
+            {displayFileSize !== null && (
+              <div>大小: {(displayFileSize / 1024).toFixed(1)}KB</div>
+            )}
+          </div>
         </div>
       )}
     </div>

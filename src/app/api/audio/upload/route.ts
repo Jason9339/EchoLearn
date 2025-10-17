@@ -1,82 +1,129 @@
 import { auth } from '@/auth';
-import { generateLabeledAudioFilename, validateAudioFile } from '@/app/lib/audio';
-import { OFFICIAL_SLOT, getSlotLabel } from '@/types/audio';
+import { generateLabeledAudioFilename, sanitizePathComponent, validateAudioFile } from '@/app/lib/audio';
+import { getSlotLabel } from '@/types/audio';
+import { getSupabaseAdmin } from '@/app/lib/supabase';
+import postgres from 'postgres';
+
+const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
 /**
  * POST /api/audio/upload
  * Accepts multipart/form-data: audio (file), sentenceId, slotIndex
  * Returns JSON: { success, recordingId, audioUrl, duration }
  *
- * NOTE: This implementation stubs persistence and returns a fake id/url.
- *       Hooks are marked with TODOs for wiring to PostgreSQL later.
+ * Uploads audio file to Supabase Storage and persists metadata to PostgreSQL
  */
 export async function POST(request: Request): Promise<Response> {
   const session = await auth();
-  if (!session?.user?.id) {
+
+  let userId = session?.user?.id ?? null;
+
+  if (!userId && session?.user?.email) {
+    try {
+      const userRecords = await sql<{ id: string }[]>`
+        SELECT id
+        FROM users
+        WHERE email = ${session.user.email}
+        LIMIT 1
+      `;
+      if (userRecords.length > 0) {
+        userId = String(userRecords[0].id);
+      }
+    } catch (lookupError) {
+      console.error('[audio/upload] failed to lookup user id by email', lookupError);
+    }
+  }
+
+  if (!userId) {
+    console.error('[audio/upload] unauthorized session', session);
     return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
 
+  const normalizedUserId = String(userId);
+
   try {
     const formData = await request.formData();
-    const file = formData.get('audio');
-    const sentenceIdRaw = formData.get('sentenceId');
-    const slotIndexRaw = formData.get('slotIndex');
-    const durationRaw = formData.get('duration'); // optional, ms from client if provided
+      const file = formData.get('audio');
+      const sentenceIdRaw = formData.get('sentenceId');
+      const slotIndexRaw = formData.get('slotIndex');
+      const durationRaw = formData.get('duration'); // optional, ms from client if provided
 
-    if (!(file instanceof File)) {
-      return Response.json({ success: false, error: 'Missing audio file' }, { status: 400 });
-    }
+      if (!(file instanceof File)) {
+        return Response.json({ success: false, error: 'Missing audio file' }, { status: 400 });
+      }
 
-    if (typeof sentenceIdRaw !== 'string' || typeof slotIndexRaw !== 'string') {
-      return Response.json({ success: false, error: 'Missing sentenceId or slotIndex' }, { status: 400 });
-    }
+      if (typeof sentenceIdRaw !== 'string' || typeof slotIndexRaw !== 'string') {
+        return Response.json({ success: false, error: 'Missing sentenceId or slotIndex' }, { status: 400 });
+      }
 
-    const sentenceId = Number.parseInt(sentenceIdRaw, 10);
-    const slotIndex = Number.parseInt(slotIndexRaw, 10);
-    if (!Number.isFinite(sentenceId) || !Number.isFinite(slotIndex)) {
-      return Response.json({ success: false, error: 'Invalid sentenceId or slotIndex' }, { status: 400 });
-    }
+      const sentenceId = Number.parseInt(sentenceIdRaw, 10);
+      const slotIndex = Number.parseInt(slotIndexRaw, 10);
+      if (!Number.isFinite(sentenceId) || !Number.isFinite(slotIndex)) {
+        return Response.json({ success: false, error: 'Invalid sentenceId or slotIndex' }, { status: 400 });
+      }
 
-    // Validate file properties
-    const { isValid, error } = validateAudioFile(file);
-    if (!isValid) {
-      return Response.json({ success: false, error }, { status: 400 });
-    }
+      // Validate file properties
+      const { isValid, error } = validateAudioFile(file);
+      if (!isValid) {
+        return Response.json({ success: false, error }, { status: 400 });
+      }
 
-    const userId = String(session.user.id);
+    const safeUserId = sanitizePathComponent(normalizedUserId);
     const label = getSlotLabel(slotIndex); // 'official' | 'test'
-    const filename = generateLabeledAudioFilename(userId, sentenceId, slotIndex, label);
+    const filename = generateLabeledAudioFilename(normalizedUserId, sentenceId, slotIndex, label);
 
-    // TODO: Persist file to storage (e.g., local FS, S3, GCS). For now, stub URL.
-    // Example path suggestion (if using local FS): /uploads/audio/{userId}/{sentenceId}/{filename}
-    const fakeStorageUrl = `/uploads/${filename}`;
+    // Upload file to Supabase Storage
+    const supabase = getSupabaseAdmin();
+    const storagePath = `audio/${safeUserId}/${sentenceId}/${filename}`;
+
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
+    const { error: uploadError } = await supabase.storage
+      .from('recordings')
+      .upload(storagePath, buffer, {
+        contentType: 'audio/webm',
+        upsert: true, // Replace if exists
+      });
+
+    if (uploadError) {
+      console.error('Supabase upload error:', uploadError);
+      return Response.json({ success: false, error: 'Failed to upload audio file' }, { status: 500 });
+    }
+
+    // Get public URL for the uploaded file
+    const { data: urlData } = supabase.storage
+      .from('recordings')
+      .getPublicUrl(storagePath);
+
+    const audioUrl = urlData.publicUrl;
 
     // Optional duration (ms) if client sends it; else approximate 0 for now
     const duration = typeof durationRaw === 'string' ? Number.parseInt(durationRaw, 10) : 0;
 
-    // TODO: Insert row into PostgreSQL 'recordings' table
-    // Suggested schema fields: id, user_id, sentence_id, slot_index, audio_url, duration, file_size
-    // Example pseudo:
-    // const { rows: [rec] } = await db.query(
-    //   `INSERT INTO recordings (user_id, sentence_id, slot_index, audio_url, duration, file_size)
-    //    VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-    //   [userId, sentenceId, slotIndex, fakeStorageUrl, duration, file.size]
-    // );
-    // const recordingId = rec.id as string;
+    // Insert or update recording in database using UPSERT
+    const result = await sql`
+      INSERT INTO recordings (user_id, sentence_id, slot_index, audio_url, duration, file_size)
+      VALUES (${normalizedUserId}, ${sentenceId}, ${slotIndex}, ${audioUrl}, ${duration}, ${file.size})
+      ON CONFLICT (user_id, sentence_id, slot_index)
+      DO UPDATE SET
+        audio_url = EXCLUDED.audio_url,
+        duration = EXCLUDED.duration,
+        file_size = EXCLUDED.file_size,
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING id
+    `;
 
-    // For stub response, synthesize a deterministic id
-    const recordingId = `${userId}-${sentenceId}-${slotIndex}-${Date.now()}`;
+    const recordingId = result[0]?.id as string;
 
     return Response.json({
       success: true,
       recordingId,
-      audioUrl: fakeStorageUrl,
+      audioUrl,
       duration,
     });
-  } catch (e) {
-    console.error('Upload error:', e);
+  } catch (error) {
+    console.error('Upload error:', error);
     return Response.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
   }
 }
-
-

@@ -88,15 +88,15 @@ export default function AudioPlayer({
         type="button"
         onClick={isPlaying ? onPause : onPlay}
         disabled={isLoading}
-        className="flex items-center justify-center w-7 h-7 rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm"
+        className="flex items-center justify-center w-7 h-7 rounded-full bg-white border-2 border-[#41A67E] hover:border-[#56BF94] disabled:border-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm"
         aria-label={isPlaying ? '暫停播放' : '播放音頻'}
       >
         {isLoading ? (
-          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          <div className="w-3 h-3 border-2 border-[#41A67E] border-t-transparent rounded-full animate-spin" />
         ) : isPlaying ? (
-          <PauseIcon className="h-3 w-3 text-white" />
+          <PauseIcon className="h-3 w-3 text-[#41A67E]" />
         ) : (
-          <PlayIcon className="h-3 w-3 text-white ml-0.5" />
+          <PlayIcon className="h-3 w-3 text-[#41A67E] ml-0.5" />
         )}
       </button>
     </div>

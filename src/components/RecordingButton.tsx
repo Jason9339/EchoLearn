@@ -39,6 +39,9 @@ export default function RecordingButton({
     return 'idle';
   };
 
+  // Check if recording has been uploaded (has URL but no blob)
+  const isUploaded = recordingState.audioUrl && !recordingState.audioBlob;
+
   const getButtonText = (): string => {
     const state = getButtonState();
     
@@ -142,14 +145,16 @@ export default function RecordingButton({
             relative w-16 h-16 rounded-full flex items-center justify-center
             transition-all duration-300 ease-in-out transform hover:scale-105
             focus:outline-none focus:ring-4 focus:ring-opacity-50
-            ${buttonState === 'recording' 
-              ? 'bg-red-500 hover:bg-red-600 focus:ring-red-300 text-white' 
+            ${buttonState === 'recording'
+              ? 'bg-red-500 hover:bg-red-600 focus:ring-red-300 text-white'
               : buttonState === 'recorded'
-              ? 'bg-green-500 hover:bg-green-600 focus:ring-green-300 text-white'
+              ? isUploaded
+                ? 'bg-[#A7E399] hover:bg-[#8FD47E] focus:ring-[#A7E399]/30 text-gray-800'
+                : 'bg-[#476EAE] hover:bg-[#5A85C9] focus:ring-[#476EAE]/30 text-white'
               : buttonState === 'uploading'
-              ? 'bg-blue-500 hover:bg-blue-600 focus:ring-blue-300 text-white'
+              ? 'bg-[#476EAE] hover:bg-[#5A85C9] focus:ring-[#476EAE]/30 text-white'
               : buttonState === 'ready'
-              ? 'bg-blue-500 hover:bg-blue-600 focus:ring-blue-300 text-white'
+              ? 'bg-[#476EAE] hover:bg-[#5A85C9] focus:ring-[#476EAE]/30 text-white'
               : buttonState === 'disabled'
               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
               : 'bg-gray-100 hover:bg-gray-200 focus:ring-gray-300 text-gray-700'
@@ -273,8 +278,10 @@ export default function RecordingButton({
                   recordingState.isUploading
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : recordingState.audioBlob
-                      ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                      : 'bg-green-500 text-white cursor-default'
+                      ? 'bg-[#476EAE] hover:bg-[#5A85C9] text-white'
+                      : showUploadSuccess
+                        ? 'bg-[#A7E399] text-gray-800 cursor-default'
+                        : 'bg-[#476EAE] text-white cursor-default'
                 }`}
               >
                 {recordingState.isUploading ? (

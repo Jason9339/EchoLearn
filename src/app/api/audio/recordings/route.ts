@@ -6,7 +6,7 @@ const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 /**
  * GET /api/audio/recordings
  * Get all recordings for the current user
- * Returns JSON: { success, recordings: [{ id, sentenceId, slotIndex, audioUrl, duration, createdAt }] }
+ * Returns JSON: { success, recordings: [{ id, courseId, sentenceId, slotIndex, audioUrl, duration, createdAt }] }
  */
 export async function GET(): Promise<Response> {
   const session = await auth();
@@ -40,6 +40,7 @@ export async function GET(): Promise<Response> {
     const recordings = await sql`
       SELECT
         id,
+        course_id as "courseId",
         sentence_id as "sentenceId",
         slot_index as "slotIndex",
         audio_url as "audioUrl",
@@ -48,13 +49,14 @@ export async function GET(): Promise<Response> {
         created_at as "createdAt"
       FROM recordings
       WHERE user_id = ${normalizedUserId}
-      ORDER BY sentence_id, slot_index
+      ORDER BY course_id, sentence_id, slot_index
     `;
 
     return Response.json({
       success: true,
       recordings: recordings.map(rec => ({
         id: rec.id,
+        courseId: rec.courseId,
         sentenceId: rec.sentenceId,
         slotIndex: rec.slotIndex,
         audioUrl: rec.audioUrl,

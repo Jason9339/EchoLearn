@@ -20,8 +20,24 @@ async function getUser(email: string): Promise<User | undefined> {
 
 export const { auth, signIn, signOut, handlers } = NextAuth({
   ...authConfig,
-  // 可選：明確聲明使用 JWT 策略（v5 預設就是 JWT）
-  session: { strategy: 'jwt' },
+  // JWT 策略
+  session: {
+    strategy: 'jwt',
+    // 不設定 maxAge，讓瀏覽器決定（關閉瀏覽器後失效）
+  },
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        // 關鍵：不設定 maxAge 和 expires，讓它成為 session cookie
+        // session cookie 會在關閉瀏覽器時自動刪除
+      }
+    }
+  },
   providers: [
     Credentials({
       // 也可以加上 credentials 欄位描述（非必填）

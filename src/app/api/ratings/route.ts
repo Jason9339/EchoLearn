@@ -39,18 +39,18 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const body = await request.json();
-    const { sentenceId, slotIndex, score } = body;
+    const { courseId, sentenceId, slotIndex, score } = body;
 
     // Validate input
-    if (typeof sentenceId !== 'number' || typeof slotIndex !== 'number' || typeof score !== 'number') {
-      return Response.json({ success: false, error: 'Invalid input: sentenceId, slotIndex, and score are required' }, { status: 400 });
+    if (typeof courseId !== 'string' || typeof sentenceId !== 'number' || typeof slotIndex !== 'number' || typeof score !== 'number') {
+      return Response.json({ success: false, error: 'Invalid input: courseId, sentenceId, slotIndex, and score are required' }, { status: 400 });
     }
 
     if (score < 1 || score > 5) {
       return Response.json({ success: false, error: 'Score must be between 1 and 5' }, { status: 400 });
     }
 
-    // First, find the recording_id for this sentence and slot
+    // First, find the recording_id for this course, sentence and slot
     // We need to find the recording that the current user wants to rate
     // Note: The user might be rating someone else's recording, or their own
     // For now, we'll assume they're rating their own recording
@@ -58,6 +58,7 @@ export async function POST(request: Request): Promise<Response> {
       SELECT id::text
       FROM recordings
       WHERE user_id::text = ${normalizedUserId}
+        AND course_id = ${courseId}
         AND sentence_id = ${sentenceId}
         AND slot_index = ${slotIndex}
       LIMIT 1

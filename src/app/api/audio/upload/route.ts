@@ -8,7 +8,7 @@ const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
 /**
  * POST /api/audio/upload
- * Accepts multipart/form-data: audio (file), sentenceId, slotIndex
+ * Accepts multipart/form-data: audio (file), courseId, sentenceId, slotIndex
  * Returns JSON: { success, recordingId, audioUrl, duration }
  *
  * Uploads audio file to Supabase Storage and persists metadata to PostgreSQL
@@ -44,6 +44,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const formData = await request.formData();
       const file = formData.get('audio');
+      const courseIdRaw = formData.get('courseId');
       const sentenceIdRaw = formData.get('sentenceId');
       const slotIndexRaw = formData.get('slotIndex');
       const durationRaw = formData.get('duration'); // optional, ms from client if provided
@@ -52,9 +53,11 @@ export async function POST(request: Request): Promise<Response> {
         return Response.json({ success: false, error: 'Missing audio file' }, { status: 400 });
       }
 
-      if (typeof sentenceIdRaw !== 'string' || typeof slotIndexRaw !== 'string') {
-        return Response.json({ success: false, error: 'Missing sentenceId or slotIndex' }, { status: 400 });
+      if (typeof courseIdRaw !== 'string' || typeof sentenceIdRaw !== 'string' || typeof slotIndexRaw !== 'string') {
+        return Response.json({ success: false, error: 'Missing courseId, sentenceId or slotIndex' }, { status: 400 });
       }
+
+      const courseId = courseIdRaw;
 
       const sentenceId = Number.parseInt(sentenceIdRaw, 10);
       const slotIndex = Number.parseInt(slotIndexRaw, 10);
@@ -103,9 +106,9 @@ export async function POST(request: Request): Promise<Response> {
 
     // Insert or update recording in database using UPSERT
     const result = await sql`
-      INSERT INTO recordings (user_id, sentence_id, slot_index, audio_url, duration, file_size)
-      VALUES (${normalizedUserId}, ${sentenceId}, ${slotIndex}, ${audioUrl}, ${duration}, ${file.size})
-      ON CONFLICT (user_id, sentence_id, slot_index)
+      INSERT INTO recordings (user_id, course_id, sentence_id, slot_index, audio_url, duration, file_size)
+      VALUES (${normalizedUserId}, ${courseId}, ${sentenceId}, ${slotIndex}, ${audioUrl}, ${duration}, ${file.size})
+      ON CONFLICT (user_id, course_id, sentence_id, slot_index)
       DO UPDATE SET
         audio_url = EXCLUDED.audio_url,
         duration = EXCLUDED.duration,

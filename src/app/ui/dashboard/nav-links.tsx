@@ -4,6 +4,7 @@ import {
   HomeIcon,
   BookOpenIcon,
   UserCircleIcon,
+  UsersIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -17,6 +18,11 @@ const links = [
     name: 'Course',
     href: '/dashboard/course',
     icon: BookOpenIcon,
+  },
+  {
+    name: 'Peer Review',
+    href: '/dashboard/peer-review',
+    icon: UsersIcon,
   },
   {
     name: 'My Profile',

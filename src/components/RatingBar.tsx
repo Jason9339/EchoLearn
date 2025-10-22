@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 
 interface RatingBarProps {
+  courseId: string;
   sentenceId: number;
   slotIndex: number;
   isLocked: boolean; // true if no recording uploaded yet
@@ -16,6 +17,7 @@ interface RatingBarProps {
  * Locked when no recording has been uploaded
  */
 export default function RatingBar({
+  courseId,
   sentenceId,
   slotIndex,
   isLocked,
@@ -52,6 +54,7 @@ export default function RatingBar({
         },
         credentials: 'include',
         body: JSON.stringify({
+          courseId,
           sentenceId,
           slotIndex,
           score,

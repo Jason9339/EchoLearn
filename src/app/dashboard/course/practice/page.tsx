@@ -484,6 +484,7 @@ export default function PracticePage() {
 
       const formData = new FormData();
       formData.append('audio', recordingState.audioBlob, 'recording.webm');
+      formData.append('courseId', courseId);
       formData.append('sentenceId', String(sentenceId));
       formData.append('slotIndex', String(slotIndex));
       formData.append('duration', String(recordingState.duration));
@@ -709,6 +710,7 @@ export default function PracticePage() {
 
                         {/* Rating Bar - shown below each recording button */}
                         <RatingBar
+                          courseId={courseId}
                           sentenceId={sentence.id}
                           slotIndex={slotIndex}
                           isLocked={!hasUploaded}

@@ -18,7 +18,7 @@ export const authConfig = {
 
       if (isOnDashboard) return isLoggedIn;
       if (isAuthPage) return true; // Allow access to login and register pages
-      if (isLoggedIn) return Response.redirect(new URL('/dashboard', nextUrl));
+      // Removed auto-redirect to dashboard, users can access home page
       return true;
     },
   },

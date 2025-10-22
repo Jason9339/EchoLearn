@@ -10,6 +10,7 @@ import { courses, defaultPracticeCourseId, practiceSentences } from '@/app/lib/p
 import type { PracticeSentence } from '@/app/lib/definitions';
 import type { RecordingState } from '@/types/audio';
 import RecordingButton from '@/components/RecordingButton';
+import RatingBar from '@/components/RatingBar';
 
 const courseId = defaultPracticeCourseId;
 const fallbackCourseTitle = '口說練習';
@@ -21,10 +22,18 @@ type SentenceRecordingStates = {
   };
 };
 
+// Type for managing ratings for each sentence and slot
+type SentenceRatings = {
+  [sentenceId: number]: {
+    [slotIndex: number]: number | null;
+  };
+};
+
 export default function PracticePage() {
   const { status: sessionStatus } = useSession();
   const [recordingStates, setRecordingStates] = useState<SentenceRecordingStates>({});
   const [playedSentences, setPlayedSentences] = useState<Set<number>>(new Set());
+  const [ratings, setRatings] = useState<SentenceRatings>({});
 
   // Use refs to store MediaRecorder instances and cleanup functions
   const mediaRecordersRef = useRef<Record<string, MediaRecorder>>({});
@@ -66,7 +75,7 @@ export default function PracticePage() {
     });
   }, [initializeRecordingState]);
 
-  // Load existing recordings on mount
+  // Load existing recordings and ratings on mount
   useEffect(() => {
     if (sessionStatus === 'loading' || sessionStatus === 'unauthenticated') {
       return;
@@ -122,7 +131,53 @@ export default function PracticePage() {
       }
     };
 
+    const loadRatings = async () => {
+      try {
+        const response = await fetch('/api/ratings', {
+          credentials: 'include',
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => 'Unknown error');
+          if (response.status !== 401) {
+            console.error('Failed to load ratings:', response.status, errorText);
+          }
+          return;
+        }
+
+        const data = await response.json();
+        console.log('Loaded ratings:', data);
+        if (data.success && data.ratings && data.ratings.length > 0) {
+          // Set existing ratings to state
+          const newRatings: SentenceRatings = {};
+          data.ratings.forEach((rating: {
+            id: number;
+            sentenceId: number;
+            slotIndex: number;
+            score: number;
+          }) => {
+            if (!newRatings[rating.sentenceId]) {
+              newRatings[rating.sentenceId] = {};
+            }
+            newRatings[rating.sentenceId][rating.slotIndex] = rating.score;
+            console.log(`Setting rating for sentence ${rating.sentenceId}, slot ${rating.slotIndex}: ${rating.score}`);
+          });
+          console.log('Final ratings state:', newRatings);
+          setRatings(newRatings);
+        } else {
+          console.log('No ratings found or empty response');
+        }
+      } catch (error) {
+        // Ignore AbortError when component unmounts
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
+        console.error('Error loading ratings:', error);
+      }
+    };
+
     loadRecordings();
+    loadRatings();
 
     return () => {
       controller.abort();
@@ -393,6 +448,22 @@ export default function PracticePage() {
     });
   }, [getRecordingState, updateRecordingState]);
 
+  // Handle rating update
+  const handleRateRecording = useCallback((sentenceId: number, slotIndex: number, score: number) => {
+    setRatings(prev => ({
+      ...prev,
+      [sentenceId]: {
+        ...prev[sentenceId],
+        [slotIndex]: score,
+      },
+    }));
+  }, []);
+
+  // Get rating for a specific sentence and slot
+  const getRating = useCallback((sentenceId: number, slotIndex: number): number | null => {
+    return ratings[sentenceId]?.[slotIndex] ?? null;
+  }, [ratings]);
+
   // Handle upload to server
   const handleUploadRecording = useCallback(async (sentenceId: number, slotIndex: number) => {
     const recordingState = getRecordingState(sentenceId, slotIndex);
@@ -508,7 +579,7 @@ export default function PracticePage() {
           return (
             <article
               key={sentence.id}
-              className="rounded-xl border bg-white p-6 shadow-sm transition hover:border-sky-200"
+              className="rounded-xl border bg-white p-6 shadow-sm transition hover:border-[#476EAE]/30"
             >
               {/* Sentence Content */}
               <div className="mb-6">
@@ -591,7 +662,7 @@ export default function PracticePage() {
                     <button
                       type="button"
                       onClick={() => handlePlay(sentence)}
-                      className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700"
+                      className="inline-flex items-center gap-2 rounded-lg bg-[#476EAE] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#5A85C9]"
                     >
                       <PlayIcon className="h-5 w-5" /> 播放原音
                     </button>
@@ -604,7 +675,7 @@ export default function PracticePage() {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base font-medium text-gray-900">錄音練習</h3>
                   {hasAnyRecording && (
-                    <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                    <span className="text-xs text-[#476EAE] bg-[#476EAE]/10 px-2 py-1 rounded-full font-medium">
                       ✓ 已錄音
                     </span>
                   )}
@@ -614,6 +685,8 @@ export default function PracticePage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {[0, 1, 2].map((slotIndex) => {
                     const recordingState = getRecordingState(sentence.id, slotIndex);
+                    const hasUploaded = recordingState.audioUrl && !recordingState.audioBlob;
+                    const currentRating = getRating(sentence.id, slotIndex);
 
                     return (
                       <div key={slotIndex} className="space-y-3">
@@ -633,6 +706,16 @@ export default function PracticePage() {
                           onUploadRecording={() => handleUploadRecording(sentence.id, slotIndex)}
                           hasPlayedOriginal={playedSentences.has(sentence.id)}
                         />
+
+                        {/* Rating Bar - shown below each recording button */}
+                        <RatingBar
+                          sentenceId={sentence.id}
+                          slotIndex={slotIndex}
+                          isLocked={!hasUploaded}
+                          initialRating={currentRating}
+                          onRate={(score) => handleRateRecording(sentence.id, slotIndex, score)}
+                          className="mt-2"
+                        />
                       </div>
                     );
                   })}
@@ -649,7 +732,7 @@ export default function PracticePage() {
                           <div
                             key={slotIndex}
                             className={`w-2 h-2 rounded-full ${
-                              hasRecording ? 'bg-green-500' : 'bg-gray-300'
+                              hasRecording ? 'bg-[#476EAE]' : 'bg-gray-300'
                             }`}
                           />
                         );

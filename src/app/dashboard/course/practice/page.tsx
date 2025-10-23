@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { PlayIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/outline';
 import { useSession } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 
 import { courses, defaultPracticeCourseId, practiceSentences } from '@/app/lib/placeholder-data';
 import type { PracticeSentence } from '@/app/lib/definitions';
@@ -12,7 +13,6 @@ import type { RecordingState } from '@/types/audio';
 import RecordingButton from '@/components/RecordingButton';
 import RatingBar from '@/components/RatingBar';
 
-const courseId = defaultPracticeCourseId;
 const fallbackCourseTitle = '口說練習';
 
 // Type for managing recording states for each sentence and slot
@@ -31,6 +31,9 @@ type SentenceRatings = {
 
 export default function PracticePage() {
   const { status: sessionStatus } = useSession();
+  const searchParams = useSearchParams();
+  const selectedCourseId = searchParams.get('courseId') ?? defaultPracticeCourseId;
+  const courseId = practiceSentences[selectedCourseId] ? selectedCourseId : defaultPracticeCourseId;
   const [recordingStates, setRecordingStates] = useState<SentenceRecordingStates>({});
   const [playedSentences, setPlayedSentences] = useState<Set<number>>(new Set());
   const [ratings, setRatings] = useState<SentenceRatings>({});
@@ -41,6 +44,20 @@ export default function PracticePage() {
 
   const currentCourse = courses.find((course) => course.id === courseId);
   const sentences: PracticeSentence[] = practiceSentences[courseId] ?? [];
+
+  useEffect(() => {
+    Object.values(mediaRecordersRef.current).forEach(recorder => {
+      if (recorder.state === 'recording') {
+        recorder.stop();
+      }
+    });
+    Object.values(cleanupFunctionsRef.current).forEach(cleanup => cleanup());
+    mediaRecordersRef.current = {};
+    cleanupFunctionsRef.current = {};
+    setRecordingStates({});
+    setPlayedSentences(new Set<number>());
+    setRatings({});
+  }, [courseId]);
 
   // Initialize recording state for a sentence slot
   const initializeRecordingState = useCallback((): RecordingState => {
@@ -104,6 +121,7 @@ export default function PracticePage() {
           // Set existing recordings to state
           data.recordings.forEach((rec: {
             id: string;
+            courseId: string;
             sentenceId: number;
             slotIndex: number;
             audioUrl: string;
@@ -111,6 +129,7 @@ export default function PracticePage() {
             fileSize: number;
             createdAt: string;
           }) => {
+            if (rec.courseId !== courseId) return;
             updateRecordingState(rec.sentenceId, rec.slotIndex, {
               audioBlob: null, // We don't have the blob, but we have the URL
               audioUrl: rec.audioUrl,
@@ -182,7 +201,7 @@ export default function PracticePage() {
     return () => {
       controller.abort();
     };
-  }, [sessionStatus, updateRecordingState]);
+  }, [sessionStatus, updateRecordingState, courseId]);
 
   // Cleanup effect for component unmount
   useEffect(() => {

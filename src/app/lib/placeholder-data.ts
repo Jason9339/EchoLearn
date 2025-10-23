@@ -6,14 +6,14 @@ export const courses: Course[] = [
     title: 'Shadowing Man',
     description: '基礎影子跟讀課程，從簡單句子開始。(男聲)',
     actionLabel: '開始練習',
-    practicePath: '/dashboard/course/practice',
+    practicePath: '/dashboard/course/practice?courseId=shadowing-101',
   },
   {
     id: 'daily-practice',
     title: 'Shadowing Women',
     description: '基礎影子跟讀課程，從簡單句子開始。(女聲)',
     actionLabel: '開始練習',
-    practicePath: '/dashboard/course/practice',
+    practicePath: '/dashboard/course/practice?courseId=daily-practice',
   },
 ];
 

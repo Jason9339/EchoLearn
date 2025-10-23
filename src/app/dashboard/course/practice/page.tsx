@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { Suspense, useState, useCallback, useRef, useEffect } from 'react';
 import { PlayIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/outline';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -30,6 +30,14 @@ type SentenceRatings = {
 };
 
 export default function PracticePage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-10 text-sm text-gray-500">練習內容載入中…</div>}>
+      <PracticePageContent />
+    </Suspense>
+  );
+}
+
+function PracticePageContent() {
   const { status: sessionStatus } = useSession();
   const searchParams = useSearchParams();
   const selectedCourseId = searchParams.get('courseId') ?? defaultPracticeCourseId;
@@ -549,7 +557,7 @@ export default function PracticePage() {
         error: errorMessage,
       });
     }
-  }, [getRecordingState, updateRecordingState, sessionStatus]);
+  }, [courseId, getRecordingState, updateRecordingState, sessionStatus]);
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 md:py-12">

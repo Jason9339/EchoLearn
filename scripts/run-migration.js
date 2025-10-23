@@ -5,8 +5,8 @@
  * Usage: node scripts/run-migration.js migrations/create_ratings_table.sql
  */
 
-const { readFileSync } = require('fs');
-const postgres = require('postgres');
+import { readFileSync } from 'fs';
+import postgres from 'postgres';
 
 // Get migration file from command line argument
 const migrationFile = process.argv[2];

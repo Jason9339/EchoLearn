@@ -123,3 +123,25 @@ export async function updateUserInfo(
     return { message: 'Failed to save user information' };
   }
 }
+
+import { revalidatePath } from 'next/cache';
+
+export async function updateUser(userId: string, formData: { name: string; student_id: string; gender: string; age: number }) {
+  const { name, student_id, gender, age } = formData;
+
+  try {
+    await sql`
+      UPDATE users
+      SET name = ${name},
+          student_id = ${student_id},
+          gender = ${gender},
+          age = ${age}
+      WHERE id = ${userId}
+    `;
+    revalidatePath('/dashboard/profile');
+    return { message: 'User updated successfully' };
+  } catch (error) {
+    console.error('Failed to update user:', error);
+    throw new Error('Failed to update user.');
+  }
+}

@@ -1,12 +1,16 @@
 import { auth } from '@/auth';
 import postgres from 'postgres';
 
+import UpdateUserInfo from '@/app/ui/dashboard/update-user-info';
+
+import { User } from '@/app/lib/definitions';
+
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
-async function getUser(mail: string) {
+async function getUser(mail: string): Promise<User | undefined> {
   try {
-    const user = await sql`SELECT * FROM users WHERE email = ${mail}`;
-    return user[0];
+    const users = await sql<User[]>`SELECT * FROM users WHERE email = ${mail}`;
+    return users[0];
   } catch (error) {
     console.error('Failed to fetch user:', error);
     throw new Error('Failed to fetch user.');
@@ -21,6 +25,10 @@ export default async function ProfilePage() {
   }
 
   const user = await getUser(session.user.email);
+
+  if (!user) {
+    return <p>User not found.</p>;
+  }
 
   const genderMap: Record<string, string> = {
     male: '男性',
@@ -94,9 +102,7 @@ export default async function ProfilePage() {
         </div>
       </div>
 
-      <div className="mt-6 text-sm text-gray-500">
-        <p>如需更新您的個人資料，請聯繫系統管理員。</p>
-      </div>
+      <UpdateUserInfo user={user} />
     </div>
   );
 }

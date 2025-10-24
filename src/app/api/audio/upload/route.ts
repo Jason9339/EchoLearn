@@ -1,5 +1,11 @@
 import { auth } from '@/auth';
-import { generateLabeledAudioFilename, sanitizePathComponent, validateAudioFile } from '@/app/lib/audio';
+import {
+  extractStoragePathFromUrl,
+  generateLabeledAudioFilename,
+  getStorageFolderForCourse,
+  sanitizePathComponent,
+  validateAudioFile,
+} from '@/app/lib/audio';
 import { getSlotLabel } from '@/types/audio';
 import { getSupabaseAdmin } from '@/app/lib/supabase';
 import postgres from 'postgres';
@@ -71,13 +77,37 @@ export async function POST(request: Request): Promise<Response> {
         return Response.json({ success: false, error }, { status: 400 });
       }
 
+    let previousStoragePath: string | null = null;
+    try {
+      const existingRecord = await sql<{ audioUrl: string | null }[]>`
+        SELECT audio_url AS "audioUrl"
+        FROM recordings
+        WHERE user_id = ${normalizedUserId}
+          AND course_id = ${courseId}
+          AND sentence_id = ${sentenceId}
+          AND slot_index = ${slotIndex}
+        LIMIT 1
+      `;
+      if (existingRecord.length > 0 && existingRecord[0].audioUrl) {
+        previousStoragePath = extractStoragePathFromUrl(existingRecord[0].audioUrl);
+      }
+    } catch (existingError) {
+      console.error('[audio/upload] failed to fetch existing recording for cleanup', existingError, {
+        userId: normalizedUserId,
+        courseId,
+        sentenceId,
+        slotIndex,
+      });
+    }
+
     const safeUserId = sanitizePathComponent(normalizedUserId);
     const label = getSlotLabel(slotIndex); // 'official' | 'test'
     const filename = generateLabeledAudioFilename(normalizedUserId, sentenceId, slotIndex, label);
 
     // Upload file to Supabase Storage
     const supabase = getSupabaseAdmin();
-    const storagePath = `audio/${safeUserId}/${sentenceId}/${filename}`;
+    const storageBaseFolder = getStorageFolderForCourse(courseId);
+    const storagePath = `${storageBaseFolder}/${safeUserId}/${sentenceId}/${filename}`;
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
@@ -118,6 +148,22 @@ export async function POST(request: Request): Promise<Response> {
     `;
 
     const recordingId = result[0]?.id as string;
+
+    if (previousStoragePath && previousStoragePath !== storagePath) {
+      const { error: removeError } = await supabase.storage
+        .from('recordings')
+        .remove([previousStoragePath]);
+
+      if (removeError) {
+        console.error('Supabase cleanup error:', removeError, {
+          previousStoragePath,
+          userId: normalizedUserId,
+          courseId,
+          sentenceId,
+          slotIndex,
+        });
+      }
+    }
 
     return Response.json({
       success: true,

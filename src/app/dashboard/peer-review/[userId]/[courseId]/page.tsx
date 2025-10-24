@@ -8,6 +8,8 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   UserIcon,
+  PlayIcon,
+  PauseIcon,
 } from '@heroicons/react/24/outline';
 import AudioPlayer from '@/components/AudioPlayer';
 import { practiceSentences } from '@/app/lib/placeholder-data';
@@ -132,7 +134,7 @@ export default function PeerReviewRatingPage() {
   const [ratings, setRatings] = useState<{ [key: string]: number }>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [playingAudio, setPlayingAudio] = useState<'original' | 'user' | null>(null);
+  const [playingAudio, setPlayingAudio] = useState<'original' | 'user' | 'both' | null>(null);
 
   // Get current recording and sentence data
   const currentRecording = recordings[currentIndex];
@@ -237,6 +239,18 @@ export default function PeerReviewRatingPage() {
       });
     }
   }, []);
+
+  const handlePlayBoth = useCallback(() => {
+    if (!sentence?.audioSrc || !currentRecording?.audioUrl) {
+      return;
+    }
+
+    setPlayingAudio(prev => (prev === 'both' ? null : 'both'));
+  }, [sentence?.audioSrc, currentRecording?.audioUrl]);
+
+  useEffect(() => {
+    setPlayingAudio(null);
+  }, [currentRecording?.id]);
 
   // Calculate progress
   const ratedCount = Object.keys(ratings).length;
@@ -377,9 +391,13 @@ export default function PeerReviewRatingPage() {
                     <div className="flex justify-center">
                       <AudioPlayer
                         audioUrl={sentence.audioSrc}
-                        isPlaying={playingAudio === 'original'}
+                        isPlaying={playingAudio === 'original' || playingAudio === 'both'}
                         onPlay={() => setPlayingAudio('original')}
-                        onPause={() => setPlayingAudio(null)}
+                        onPause={() =>
+                          setPlayingAudio(prev =>
+                            prev === 'original' || prev === 'both' ? null : prev
+                          )
+                        }
                         className="flex justify-center"
                       />
                     </div>
@@ -400,9 +418,13 @@ export default function PeerReviewRatingPage() {
                 <div className="flex justify-center">
                   <AudioPlayer
                     audioUrl={currentRecording.audioUrl}
-                    isPlaying={playingAudio === 'user'}
+                    isPlaying={playingAudio === 'user' || playingAudio === 'both'}
                     onPlay={() => setPlayingAudio('user')}
-                    onPause={() => setPlayingAudio(null)}
+                    onPause={() =>
+                      setPlayingAudio(prev =>
+                        prev === 'user' || prev === 'both' ? null : prev
+                      )
+                    }
                     className="flex justify-center"
                   />
                 </div>
@@ -411,6 +433,31 @@ export default function PeerReviewRatingPage() {
                 </div>
               </div>
             </div>
+            {sentence?.audioSrc && currentRecording?.audioUrl && (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={handlePlayBoth}
+                  className={`inline-flex items-center gap-2 rounded-lg border-2 px-4 py-2 text-sm font-medium transition ${
+                    playingAudio === 'both'
+                      ? 'border-[#41A67E] bg-[#41A67E] text-white hover:bg-[#349269]'
+                      : 'border-[#476EAE] text-[#476EAE] hover:bg-[#476EAE] hover:text-white'
+                  }`}
+                >
+                  {playingAudio === 'both' ? (
+                    <>
+                      <PauseIcon className="h-5 w-5" />
+                      停止同時播放
+                    </>
+                  ) : (
+                    <>
+                      <PlayIcon className="h-5 w-5" />
+                      同時播放
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
 
             {/* Rating Section */}
             <div className="border-t pt-6">

@@ -154,6 +154,34 @@ export function generateLabeledAudioFilename(
   return `${safeUserId}_${sentenceId}_${label}-${slotIndex}_${timestamp}.webm`;
 }
 
+const COURSE_STORAGE_FOLDER_MAP: Record<string, string> = {
+  'daily-practice': 'audio-women',
+};
+
+const DEFAULT_RECORDINGS_FOLDER = 'audio';
+
+/**
+ * Resolve the Supabase storage folder for a given course.
+ * Defaults to `audio`, but maps known courses (e.g. female voice courses) to dedicated folders.
+ * @param courseId - Course identifier
+ */
+export function getStorageFolderForCourse(courseId: string): string {
+  if (!courseId) {
+    return DEFAULT_RECORDINGS_FOLDER;
+  }
+
+  if (COURSE_STORAGE_FOLDER_MAP[courseId]) {
+    return COURSE_STORAGE_FOLDER_MAP[courseId];
+  }
+
+  const normalized = courseId.toLowerCase();
+  if (normalized.includes('women') || normalized.includes('woman') || normalized.includes('female')) {
+    return 'audio-women';
+  }
+
+  return DEFAULT_RECORDINGS_FOLDER;
+}
+
 /**
  * Sanitize a string so it can safely be used as part of a filesystem path.
  * Only letters, numbers, underscores and hyphens are kept; others become '_'.
@@ -199,8 +227,41 @@ export function getAudioErrorMessage(error: Error | string): string {
       return '請先播放原音';
     case 'NOT_AUTHENTICATED':
       return '需要登入才能上傳錄音';
+    case 'DELETE_FAILED':
+      return '刪除錄音失敗，請稍後再試';
     default:
       return '發生未知錯誤，請重試';
+  }
+}
+
+/**
+ * Extract the storage path from a public Supabase recordings URL.
+ * @param publicUrl - Public URL returned by Supabase
+ * @returns Storage path relative to the 'recordings' bucket, or null if not found
+ */
+export function extractStoragePathFromUrl(publicUrl: string): string | null {
+  try {
+    const parsed = new URL(publicUrl);
+    const marker = '/storage/v1/object/public/recordings/';
+    const index = parsed.pathname.indexOf(marker);
+    if (index === -1) {
+      return null;
+    }
+    const relativePath = parsed.pathname.substring(index + marker.length);
+    return decodeURIComponent(relativePath);
+  } catch {
+    const marker = '/recordings/';
+    const index = publicUrl.indexOf(marker);
+    if (index === -1) {
+      return null;
+    }
+    const pathWithQuery = publicUrl.substring(index + marker.length);
+    const path = pathWithQuery.split('?')[0];
+    try {
+      return decodeURIComponent(path);
+    } catch {
+      return path;
+    }
   }
 }
 

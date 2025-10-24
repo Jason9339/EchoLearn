@@ -2,10 +2,11 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { RecordingState, UseAudioRecorderReturn } from '@/types/audio';
+import { MAX_RECORDING_DURATION_MS } from '@/types/audio';
 
 /**
  * Custom hook for managing audio recording functionality
- * Handles MediaRecorder API, 10-second auto-stop, and error management
+ * Handles MediaRecorder API, 15-second auto-stop, and error management
  */
 export function useAudioRecorder(): UseAudioRecorderReturn {
   const [recordingState, setRecordingState] = useState<RecordingState>({
@@ -14,8 +15,10 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     duration: 0,
     audioUrl: null,
     isUploading: false,
+    isDeleting: false,
     error: null,
     fileSize: null,
+    recordingId: null,
   });
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -63,13 +66,23 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       }));
 
       // Request microphone access
+      const baseConstraints: MediaTrackConstraints = {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        channelCount: 1,
+        sampleRate: 44100,
+      };
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 44100,
-        },
+        audio: baseConstraints,
       });
+
+      const audioTrack = stream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.applyConstraints(baseConstraints).catch(() => {
+          // Ignore constraint errors and use the acquired track settings
+        });
+      }
 
       streamRef.current = stream;
 
@@ -100,6 +113,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
           audioUrl,
           duration: Date.now() - startTimeRef.current,
           fileSize: audioBlob.size,
+          isDeleting: false,
         }));
 
         cleanup();
@@ -138,12 +152,12 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
         }));
       }, 100);
 
-      // Auto-stop after 10 seconds
+      // Auto-stop after configured duration
       autoStopTimeoutRef.current = setTimeout(() => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
           mediaRecorderRef.current.stop();
         }
-      }, 10000);
+      }, MAX_RECORDING_DURATION_MS);
 
     } catch (error) {
       console.error('Failed to start recording:', error);
@@ -232,6 +246,10 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       setRecordingState(prev => ({
         ...prev,
         isUploading: false,
+        recordingId: typeof result?.recordingId === 'string'
+          ? result.recordingId
+          : prev.recordingId,
+        isDeleting: false,
       }));
 
       return result.recordingId;
@@ -243,6 +261,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
         ...prev,
         isUploading: false,
         error: 'UPLOAD_FAILED',
+        isDeleting: false,
       }));
 
       throw error;
@@ -264,8 +283,10 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       duration: 0,
       audioUrl: null,
       isUploading: false,
+      isDeleting: false,
       error: null,
       fileSize: null,
+      recordingId: null,
     });
 
     cleanup();

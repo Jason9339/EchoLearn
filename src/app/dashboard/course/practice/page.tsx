@@ -10,6 +10,7 @@ import { useSearchParams } from 'next/navigation';
 import { courses, defaultPracticeCourseId, practiceSentences } from '@/app/lib/placeholder-data';
 import type { PracticeSentence } from '@/app/lib/definitions';
 import type { RecordingState } from '@/types/audio';
+import { MAX_RECORDING_DURATION_MS } from '@/types/audio';
 import RecordingButton from '@/components/RecordingButton';
 import RatingBar from '@/components/RatingBar';
 
@@ -52,6 +53,8 @@ function PracticePageContent() {
 
   const currentCourse = courses.find((course) => course.id === courseId);
   const sentences: PracticeSentence[] = practiceSentences[courseId] ?? [];
+  const maxRecordingSeconds = Math.floor(MAX_RECORDING_DURATION_MS / 1000);
+  const defaultCourseDescription = `逐句練習：點擊播放聽一次，再點錄音模仿。每個句子可以錄製 3 次，每次最多 ${maxRecordingSeconds} 秒。`;
 
   useEffect(() => {
     Object.values(mediaRecordersRef.current).forEach(recorder => {
@@ -75,14 +78,16 @@ function PracticePageContent() {
       duration: 0,
       audioUrl: null,
       isUploading: false,
+      isDeleting: false,
       error: null,
       fileSize: null,
+      recordingId: null,
     };
   }, []);
 
   // Update recording state for a specific sentence and slot
   const updateRecordingState = useCallback((sentenceId: number, slotIndex: number, updates: Partial<RecordingState>) => {
-    console.log('updateRecordingState called:', { sentenceId, slotIndex, updates });
+    // console.log('updateRecordingState called:', { sentenceId, slotIndex, updates });
     setRecordingStates(prev => {
       const currentState = prev[sentenceId]?.[slotIndex] || initializeRecordingState();
       const newState = {
@@ -95,7 +100,7 @@ function PracticePageContent() {
           },
         },
       };
-      console.log('New recording state:', newState);
+      // console.log('New recording state:', newState);
       return newState;
     });
   }, [initializeRecordingState]);
@@ -124,7 +129,7 @@ function PracticePageContent() {
         }
 
         const data = await response.json();
-        console.log('Loaded recordings:', data);
+        // console.log('Loaded recordings:', data);
         if (data.success && data.recordings && data.recordings.length > 0) {
           // Set existing recordings to state
           data.recordings.forEach((rec: {
@@ -144,8 +149,10 @@ function PracticePageContent() {
               duration: rec.duration,
               isRecording: false,
               isUploading: false,
+              isDeleting: false,
               error: null,
               fileSize: rec.fileSize ?? null,
+              recordingId: rec.id,
             });
           });
         }
@@ -173,7 +180,7 @@ function PracticePageContent() {
         }
 
         const data = await response.json();
-        console.log('Loaded ratings:', data);
+        // console.log('Loaded ratings:', data);
         if (data.success && data.ratings && data.ratings.length > 0) {
           // Set existing ratings to state
           const newRatings: SentenceRatings = {};
@@ -187,12 +194,12 @@ function PracticePageContent() {
               newRatings[rating.sentenceId] = {};
             }
             newRatings[rating.sentenceId][rating.slotIndex] = rating.score;
-            console.log(`Setting rating for sentence ${rating.sentenceId}, slot ${rating.slotIndex}: ${rating.score}`);
+            // console.log(`Setting rating for sentence ${rating.sentenceId}, slot ${rating.slotIndex}: ${rating.score}`);
           });
-          console.log('Final ratings state:', newRatings);
+          // console.log('Final ratings state:', newRatings);
           setRatings(newRatings);
         } else {
-          console.log('No ratings found or empty response');
+          // console.log('No ratings found or empty response');
         }
       } catch (error) {
         // Ignore AbortError when component unmounts
@@ -255,11 +262,11 @@ function PracticePageContent() {
 
   // Handle recording start for a specific slot
   const handleStartRecording = useCallback(async (sentenceId: number, slotIndex: number) => {
-    console.log('handleStartRecording called:', { sentenceId, slotIndex, playedSentences: Array.from(playedSentences) });
+    // console.log('handleStartRecording called:', { sentenceId, slotIndex, playedSentences: Array.from(playedSentences) });
     
     // Check if the sentence has been played first
     if (!playedSentences.has(sentenceId)) {
-      console.log('Sentence not played yet, showing warning');
+      // console.log('Sentence not played yet, showing warning');
       // Show warning message
       updateRecordingState(sentenceId, slotIndex, {
         error: 'PLAY_FIRST',
@@ -276,26 +283,37 @@ function PracticePageContent() {
     }
 
     try {
-      console.log('Starting recording process...');
+      // console.log('Starting recording process...');
 
       // Update state to recording
       updateRecordingState(sentenceId, slotIndex, {
         isRecording: true,
         error: null,
         duration: 0,
+        isDeleting: false,
       });
 
-      console.log('Requesting microphone access...');
+      // console.log('Requesting microphone access...');
       // Request microphone access
+      const baseConstraints: MediaTrackConstraints = {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        channelCount: 1,
+        sampleRate: 44100,
+      };
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 44100,
-        },
+        audio: baseConstraints,
       });
+
+      const audioTrack = stream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.applyConstraints(baseConstraints).catch(() => {
+          // Ignore constraint errors; fall back to original track settings
+        });
+      }
       
-      console.log('Microphone access granted, creating MediaRecorder...');
+      // console.log('Microphone access granted, creating MediaRecorder...');
 
       // Check supported MIME types
       const supportedTypes = [
@@ -309,7 +327,7 @@ function PracticePageContent() {
       for (const type of supportedTypes) {
         if (MediaRecorder.isTypeSupported(type)) {
           selectedMimeType = type;
-          console.log('Using MIME type:', selectedMimeType);
+          // console.log('Using MIME type:', selectedMimeType);
           break;
         }
       }
@@ -320,19 +338,19 @@ function PracticePageContent() {
       }
 
       // Create MediaRecorder
-      console.log('Creating MediaRecorder with mimeType:', selectedMimeType);
+      // console.log('Creating MediaRecorder with mimeType:', selectedMimeType);
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: selectedMimeType,
       });
       
-      console.log('MediaRecorder created successfully, state:', mediaRecorder.state);
+      // console.log('MediaRecorder created successfully, state:', mediaRecorder.state);
 
       const chunks: Blob[] = [];
       const startTime = Date.now();
 
       // Handle data available
       mediaRecorder.ondataavailable = (event) => {
-        console.log('Data available event:', event.data.size, 'bytes');
+        // console.log('Data available event:', event.data.size, 'bytes');
         if (event.data.size > 0) {
           chunks.push(event.data);
         }
@@ -340,12 +358,12 @@ function PracticePageContent() {
 
       // Handle recording stop
       mediaRecorder.onstop = () => {
-        console.log('Recording stopped, processing audio...');
+        // console.log('Recording stopped, processing audio...');
         const audioBlob = new Blob(chunks, { type: 'audio/webm' });
         const audioUrl = URL.createObjectURL(audioBlob);
         const recordingDuration = Date.now() - startTime;
 
-        console.log('Audio blob created:', audioBlob.size, 'bytes');
+        // console.log('Audio blob created:', audioBlob.size, 'bytes');
 
         updateRecordingState(sentenceId, slotIndex, {
           isRecording: false,
@@ -353,6 +371,7 @@ function PracticePageContent() {
           audioUrl,
           duration: recordingDuration,
           fileSize: audioBlob.size,
+          isDeleting: false,
         });
 
         // Call cleanup function
@@ -361,7 +380,7 @@ function PracticePageContent() {
           cleanup();
         }
 
-        console.log('Recording completed successfully');
+        // console.log('Recording completed successfully');
       };
 
       // Handle errors
@@ -370,6 +389,7 @@ function PracticePageContent() {
         updateRecordingState(sentenceId, slotIndex, {
           error: 'RECORDING_ERROR',
           isRecording: false,
+          isDeleting: false,
         });
         
         // Call cleanup function
@@ -380,13 +400,13 @@ function PracticePageContent() {
       };
 
       // Start recording
-      console.log('Starting MediaRecorder...');
+      // console.log('Starting MediaRecorder...');
       mediaRecorder.start(100);
-      console.log('MediaRecorder started, state:', mediaRecorder.state);
+      // console.log('MediaRecorder started, state:', mediaRecorder.state);
       
       // Store MediaRecorder reference using ref
       const recorderKey = `${sentenceId}-${slotIndex}`;
-      console.log('Storing MediaRecorder with key:', recorderKey);
+      // console.log('Storing MediaRecorder with key:', recorderKey);
       mediaRecordersRef.current[recorderKey] = mediaRecorder;
       
       // Update duration every 100ms
@@ -397,14 +417,14 @@ function PracticePageContent() {
         });
       }, 100);
 
-      // Auto-stop after 10 seconds
+      // Auto-stop after configured duration
       const autoStopTimeout = setTimeout(() => {
-        console.log('Auto-stop timeout reached, stopping recording...');
+        // console.log('Auto-stop timeout reached, stopping recording...');
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
         }
         clearInterval(durationInterval);
-      }, 10000);
+      }, MAX_RECORDING_DURATION_MS);
 
       // Create cleanup function
       const cleanup = () => {
@@ -418,7 +438,7 @@ function PracticePageContent() {
       // Store cleanup function
       cleanupFunctionsRef.current[recorderKey] = cleanup;
 
-      console.log('Recording setup completed successfully');
+      // console.log('Recording setup completed successfully');
 
     } catch (error) {
       console.error('Failed to start recording:', error);
@@ -446,10 +466,10 @@ function PracticePageContent() {
     const recorderKey = `${sentenceId}-${slotIndex}`;
     const mediaRecorder = mediaRecordersRef.current[recorderKey];
     
-    console.log('handleStopRecording called:', { sentenceId, slotIndex, recorderKey, mediaRecorderState: mediaRecorder?.state });
+    // console.log('handleStopRecording called:', { sentenceId, slotIndex, recorderKey, mediaRecorderState: mediaRecorder?.state });
     
     if (mediaRecorder && mediaRecorder.state === 'recording') {
-      console.log('Stopping MediaRecorder...');
+      // console.log('Stopping MediaRecorder...');
       // Stop the MediaRecorder
       mediaRecorder.stop();
       
@@ -459,7 +479,7 @@ function PracticePageContent() {
         cleanup();
       }
     } else {
-      console.log('No active MediaRecorder found or not in recording state');
+      // console.log('No active MediaRecorder found or not in recording state');
     }
   }, []);
 
@@ -507,6 +527,7 @@ function PracticePageContent() {
       updateRecordingState(sentenceId, slotIndex, {
         isUploading: true,
         error: null,
+        isDeleting: false,
       });
 
       const formData = new FormData();
@@ -534,7 +555,7 @@ function PracticePageContent() {
       }
 
       const result = await response.json();
-      console.log('Upload successful:', result);
+      // console.log('Upload successful:', result);
 
       if (recordingState.audioBlob && recordingState.audioUrl?.startsWith('blob:')) {
         URL.revokeObjectURL(recordingState.audioUrl);
@@ -548,6 +569,10 @@ function PracticePageContent() {
           ? recordingState.audioBlob.size
           : recordingState.fileSize,
         duration: typeof result?.duration === 'number' ? result.duration : recordingState.duration,
+        isDeleting: false,
+        recordingId: typeof result?.recordingId === 'string'
+          ? result.recordingId
+          : recordingState.recordingId,
       });
     } catch (error) {
       console.error('Upload failed:', error);
@@ -555,9 +580,124 @@ function PracticePageContent() {
       updateRecordingState(sentenceId, slotIndex, {
         isUploading: false,
         error: errorMessage,
+        isDeleting: false,
       });
     }
   }, [courseId, getRecordingState, updateRecordingState, sessionStatus]);
+
+  const handleDeleteRecording = useCallback(async (sentenceId: number, slotIndex: number) => {
+    const recordingState = getRecordingState(sentenceId, slotIndex);
+
+    if (recordingState.isDeleting) {
+      return;
+    }
+
+    if (!recordingState.recordingId) {
+      if (recordingState.audioUrl && recordingState.audioUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(recordingState.audioUrl);
+      }
+      updateRecordingState(sentenceId, slotIndex, {
+        isRecording: false,
+        audioBlob: null,
+        audioUrl: null,
+        duration: 0,
+        isUploading: false,
+        isDeleting: false,
+        error: null,
+        fileSize: null,
+        recordingId: null,
+      });
+      setRatings(prev => {
+        if (!prev[sentenceId]) return prev;
+        const next = { ...prev };
+        const sentenceRatings = { ...next[sentenceId] };
+        delete sentenceRatings[slotIndex];
+        if (Object.keys(sentenceRatings).length === 0) {
+          delete next[sentenceId];
+        } else {
+          next[sentenceId] = sentenceRatings;
+        }
+        return next;
+      });
+      return;
+    }
+
+    if (sessionStatus !== 'authenticated') {
+      updateRecordingState(sentenceId, slotIndex, {
+        error: 'NOT_AUTHENTICATED',
+      });
+      return;
+    }
+
+    try {
+      updateRecordingState(sentenceId, slotIndex, {
+        isDeleting: true,
+        error: null,
+      });
+
+      const response = await fetch('/api/audio/recordings', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          recordingId: recordingState.recordingId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => ({}));
+        const errorCode = response.status === 401 ? 'NOT_AUTHENTICATED' : (errorPayload.error || 'DELETE_FAILED');
+        throw new Error(typeof errorCode === 'string' ? errorCode : 'DELETE_FAILED');
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'DELETE_FAILED');
+      }
+
+      if (recordingState.audioUrl && recordingState.audioUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(recordingState.audioUrl);
+      }
+
+      updateRecordingState(sentenceId, slotIndex, {
+        isRecording: false,
+        audioBlob: null,
+        audioUrl: null,
+        duration: 0,
+        isUploading: false,
+        isDeleting: false,
+        error: null,
+        fileSize: null,
+        recordingId: null,
+      });
+
+      setRatings(prev => {
+        if (!prev[sentenceId]) return prev;
+        const next = { ...prev };
+        const sentenceRatings = { ...next[sentenceId] };
+        delete sentenceRatings[slotIndex];
+        if (Object.keys(sentenceRatings).length === 0) {
+          delete next[sentenceId];
+        } else {
+          next[sentenceId] = sentenceRatings;
+        }
+        return next;
+      });
+
+      // if (result.storageWarning) {
+      //   console.warn('Storage deletion warning:', result.storageWarning);
+      // }
+    } catch (error) {
+      console.error('Delete recording failed:', error);
+      const errorCode = error instanceof Error ? error.message : 'DELETE_FAILED';
+      updateRecordingState(sentenceId, slotIndex, {
+        isDeleting: false,
+        error: errorCode,
+      });
+    }
+  }, [getRecordingState, sessionStatus, updateRecordingState]);
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 md:py-12">
@@ -579,7 +719,7 @@ function PracticePageContent() {
           </Link>
         </div>
         <p className="mt-3 text-sm text-gray-600">
-          {currentCourse?.description ?? '逐句練習：點擊播放聽一次，再點錄音模仿。每個句子可以錄製 3 次，每次最多 10 秒。'}
+          {currentCourse?.description ?? defaultCourseDescription}
         </p>
       </header>
 
@@ -588,7 +728,7 @@ function PracticePageContent() {
         <h3 className="text-lg font-semibold text-blue-900 mb-2">使用說明</h3>
         <ul className="text-sm text-blue-800 space-y-1">
           <li>• 點擊「播放原音」聆聽標準發音</li>
-          <li>• 每個句子可以錄製 3 次，每次最多 10 秒</li>
+          <li>• 每個句子可以錄製 3 次，每次最多 {maxRecordingSeconds} 秒</li>
           <li>• 點擊圓形按鈕開始錄音，再點擊停止錄音</li>
           <li>• 圓形按鈕背景動畫顯示剩餘時間</li>
           <li>• 錄音完成後可以立即播放聽取</li>
@@ -732,6 +872,7 @@ function PracticePageContent() {
                           onStopRecording={() => handleStopRecording(sentence.id, slotIndex)}
                           onPlayRecording={() => handlePlayRecording(sentence.id, slotIndex)}
                           onUploadRecording={() => handleUploadRecording(sentence.id, slotIndex)}
+                          onDeleteRecording={() => handleDeleteRecording(sentence.id, slotIndex)}
                           hasPlayedOriginal={playedSentences.has(sentence.id)}
                         />
 

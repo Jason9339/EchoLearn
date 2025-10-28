@@ -88,6 +88,10 @@ export interface RecordingButtonProps {
   hasPlayedOriginal?: boolean;
   /** Whether to show playback section and duration/size info */
   showDetails?: boolean;
+  /** Whether this recording is currently playing */
+  isPlaying?: boolean;
+  /** Callback when playback should stop */
+  onStopPlayback?: () => void;
 }
 
 // API related types

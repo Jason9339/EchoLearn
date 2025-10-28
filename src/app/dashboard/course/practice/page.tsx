@@ -42,19 +42,84 @@ function PracticePageContent() {
   const { status: sessionStatus } = useSession();
   const searchParams = useSearchParams();
   const selectedCourseId = searchParams.get('courseId') ?? defaultPracticeCourseId;
+  const isCustomCourse = searchParams.get('custom') === 'true';
   const courseId = practiceSentences[selectedCourseId] ? selectedCourseId : defaultPracticeCourseId;
   const [recordingStates, setRecordingStates] = useState<SentenceRecordingStates>({});
   const [playedSentences, setPlayedSentences] = useState<Set<number>>(new Set());
   const [ratings, setRatings] = useState<SentenceRatings>({});
+  const [customCourseData, setCustomCourseData] = useState<any>(null);
+  const [customSentences, setCustomSentences] = useState<PracticeSentence[]>([]);
+  const [loading, setLoading] = useState(isCustomCourse);
+  
+  // State for managing which recording is currently playing
+  const [playingRecording, setPlayingRecording] = useState<{
+    sentenceId: number;
+    slotIndex: number;
+  } | null>(null);
 
   // Use refs to store MediaRecorder instances and cleanup functions
   const mediaRecordersRef = useRef<Record<string, MediaRecorder>>({});
   const cleanupFunctionsRef = useRef<Record<string, () => void>>({});
 
-  const currentCourse = courses.find((course) => course.id === courseId);
-  const sentences: PracticeSentence[] = practiceSentences[courseId] ?? [];
+  const currentCourse = isCustomCourse ? customCourseData : courses.find((course) => course.id === courseId);
+  const sentences: PracticeSentence[] = isCustomCourse ? customSentences : (practiceSentences[courseId] ?? []);
   const maxRecordingSeconds = Math.floor(MAX_RECORDING_DURATION_MS / 1000);
   const defaultCourseDescription = `逐句練習：點擊播放聽一次，再點錄音模仿。每個句子可以錄製 3 次，每次最多 ${maxRecordingSeconds} 秒。`;
+
+  // Fetch custom course data if needed
+  useEffect(() => {
+    if (isCustomCourse && selectedCourseId) {
+      fetchCustomCourseData();
+    }
+  }, [isCustomCourse, selectedCourseId]);
+
+  const fetchCustomCourseData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch course details and status in parallel
+      const [detailsResponse, statusResponse] = await Promise.all([
+        fetch(`/api/courses/${selectedCourseId}/details`),
+        fetch(`/api/courses/${selectedCourseId}/status`)
+      ]);
+
+      if (detailsResponse.ok && statusResponse.ok) {
+        const detailsData = await detailsResponse.json();
+        const statusData = await statusResponse.json();
+
+        if (detailsData.success && statusData.success && statusData.status === 'completed') {
+          // Set course data with real title and description
+          setCustomCourseData({
+            id: selectedCourseId,
+            title: detailsData.course.title,
+            description: detailsData.course.description || `您的自訂影子跟讀課程，包含 ${statusData.sentences?.length || 0} 個句子。`,
+          });
+
+          // Convert course sentences to practice sentences format
+          const practiceFormat: PracticeSentence[] = statusData.sentences?.map((sentence: any) => ({
+            id: sentence.sentenceId,
+            text: sentence.text,
+            translation: '', // Custom courses don't have translations
+            audioSrc: sentence.audioUrl || '', // Use the generated audio URL or empty string
+          })) || [];
+
+          setCustomSentences(practiceFormat);
+        } else {
+          console.error('Custom course not ready or not found');
+          // Redirect back to course list if course is not ready
+          window.location.href = '/dashboard/course';
+        }
+      } else {
+        console.error('Failed to fetch custom course data');
+        window.location.href = '/dashboard/course';
+      }
+    } catch (error) {
+      console.error('Error fetching custom course data:', error);
+      window.location.href = '/dashboard/course';
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     Object.values(mediaRecordersRef.current).forEach(recorder => {
@@ -68,7 +133,7 @@ function PracticePageContent() {
     setRecordingStates({});
     setPlayedSentences(new Set<number>());
     setRatings({});
-  }, [courseId]);
+  }, [isCustomCourse ? selectedCourseId : courseId]);
 
   // Initialize recording state for a sentence slot
   const initializeRecordingState = useCallback((): RecordingState => {
@@ -142,7 +207,7 @@ function PracticePageContent() {
             fileSize: number;
             createdAt: string;
           }) => {
-            if (rec.courseId !== courseId) return;
+            if (rec.courseId !== (isCustomCourse ? selectedCourseId : courseId)) return;
             updateRecordingState(rec.sentenceId, rec.slotIndex, {
               audioBlob: null, // We don't have the blob, but we have the URL
               audioUrl: rec.audioUrl,
@@ -216,7 +281,7 @@ function PracticePageContent() {
     return () => {
       controller.abort();
     };
-  }, [sessionStatus, updateRecordingState, courseId]);
+  }, [sessionStatus, updateRecordingState, isCustomCourse ? selectedCourseId : courseId]);
 
   // Cleanup effect for component unmount
   useEffect(() => {
@@ -486,14 +551,45 @@ function PracticePageContent() {
   // Handle audio playback for a specific slot
   const handlePlayRecording = useCallback(async (sentenceId: number, slotIndex: number) => {
     const recordingState = getRecordingState(sentenceId, slotIndex);
-    if (!recordingState.audioUrl) return;
+    if (!recordingState.audioUrl) {
+      console.error('No audio URL found for recording');
+      return;
+    }
 
-    const audio = new Audio(recordingState.audioUrl);
-    audio.play().catch(error => {
+    // Stop any currently playing recording
+    if (playingRecording) {
+      setPlayingRecording(null);
+    }
+
+    try {
+      // Set this recording as playing
+      setPlayingRecording({ sentenceId, slotIndex });
+      
+      const audio = new Audio(recordingState.audioUrl);
+      
+      // Set up event listeners
+      audio.addEventListener('ended', () => {
+        setPlayingRecording(null);
+      });
+      
+      audio.addEventListener('error', (error) => {
+        console.error('Audio playback error:', error);
+        setPlayingRecording(null);
+        updateRecordingState(sentenceId, slotIndex, { error: 'PLAYBACK_ERROR' });
+      });
+
+      await audio.play();
+    } catch (error) {
       console.error('Failed to play audio:', error);
+      setPlayingRecording(null);
       updateRecordingState(sentenceId, slotIndex, { error: 'PLAYBACK_ERROR' });
-    });
-  }, [getRecordingState, updateRecordingState]);
+    }
+  }, [getRecordingState, updateRecordingState, playingRecording]);
+
+  // Handle stopping audio playback
+  const handleStopPlayback = useCallback(() => {
+    setPlayingRecording(null);
+  }, []);
 
   // Handle rating update
   const handleRateRecording = useCallback((sentenceId: number, slotIndex: number, score: number) => {
@@ -532,7 +628,7 @@ function PracticePageContent() {
 
       const formData = new FormData();
       formData.append('audio', recordingState.audioBlob, 'recording.webm');
-      formData.append('courseId', courseId);
+      formData.append('courseId', isCustomCourse ? selectedCourseId : courseId);
       formData.append('sentenceId', String(sentenceId));
       formData.append('slotIndex', String(slotIndex));
       formData.append('duration', String(recordingState.duration));
@@ -583,7 +679,7 @@ function PracticePageContent() {
         isDeleting: false,
       });
     }
-  }, [courseId, getRecordingState, updateRecordingState, sessionStatus]);
+  }, [isCustomCourse ? selectedCourseId : courseId, getRecordingState, updateRecordingState, sessionStatus]);
 
   const handleDeleteRecording = useCallback(async (sentenceId: number, slotIndex: number) => {
     const recordingState = getRecordingState(sentenceId, slotIndex);
@@ -698,6 +794,18 @@ function PracticePageContent() {
       });
     }
   }, [getRecordingState, sessionStatus, updateRecordingState]);
+
+  // Show loading state for custom courses
+  if (loading && isCustomCourse) {
+    return (
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 md:py-12">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-gray-600">載入自訂課程中...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 md:py-12">
@@ -827,13 +935,15 @@ function PracticePageContent() {
                     })()}
                     */}
                     {/* Play Original Audio Button */}
-                    <button
-                      type="button"
-                      onClick={() => handlePlay(sentence)}
-                      className="inline-flex items-center gap-2 rounded-lg bg-[#476EAE] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#5A85C9]"
-                    >
-                      <PlayIcon className="h-5 w-5" /> 播放原音
-                    </button>
+                    {sentence.audioSrc && (
+                      <button
+                        type="button"
+                        onClick={() => handlePlay(sentence)}
+                        className="inline-flex items-center gap-2 rounded-lg bg-[#476EAE] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#5A85C9]"
+                      >
+                        <PlayIcon className="h-5 w-5" /> 播放原音
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -874,11 +984,13 @@ function PracticePageContent() {
                           onUploadRecording={() => handleUploadRecording(sentence.id, slotIndex)}
                           onDeleteRecording={() => handleDeleteRecording(sentence.id, slotIndex)}
                           hasPlayedOriginal={playedSentences.has(sentence.id)}
+                          isPlaying={playingRecording?.sentenceId === sentence.id && playingRecording?.slotIndex === slotIndex}
+                          onStopPlayback={handleStopPlayback}
                         />
 
                         {/* Rating Bar - shown below each recording button */}
                         <RatingBar
-                          courseId={courseId}
+                          courseId={isCustomCourse ? selectedCourseId : courseId}
                           sentenceId={sentence.id}
                           slotIndex={slotIndex}
                           isLocked={!hasUploaded}

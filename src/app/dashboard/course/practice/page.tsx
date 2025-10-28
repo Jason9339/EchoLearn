@@ -50,12 +50,6 @@ function PracticePageContent() {
   const [customCourseData, setCustomCourseData] = useState<any>(null);
   const [customSentences, setCustomSentences] = useState<PracticeSentence[]>([]);
   const [loading, setLoading] = useState(isCustomCourse);
-  
-  // State for managing which recording is currently playing
-  const [playingRecording, setPlayingRecording] = useState<{
-    sentenceId: number;
-    slotIndex: number;
-  } | null>(null);
 
   // Use refs to store MediaRecorder instances and cleanup functions
   const mediaRecordersRef = useRef<Record<string, MediaRecorder>>({});
@@ -551,45 +545,14 @@ function PracticePageContent() {
   // Handle audio playback for a specific slot
   const handlePlayRecording = useCallback(async (sentenceId: number, slotIndex: number) => {
     const recordingState = getRecordingState(sentenceId, slotIndex);
-    if (!recordingState.audioUrl) {
-      console.error('No audio URL found for recording');
-      return;
-    }
+    if (!recordingState.audioUrl) return;
 
-    // Stop any currently playing recording
-    if (playingRecording) {
-      setPlayingRecording(null);
-    }
-
-    try {
-      // Set this recording as playing
-      setPlayingRecording({ sentenceId, slotIndex });
-      
-      const audio = new Audio(recordingState.audioUrl);
-      
-      // Set up event listeners
-      audio.addEventListener('ended', () => {
-        setPlayingRecording(null);
-      });
-      
-      audio.addEventListener('error', (error) => {
-        console.error('Audio playback error:', error);
-        setPlayingRecording(null);
-        updateRecordingState(sentenceId, slotIndex, { error: 'PLAYBACK_ERROR' });
-      });
-
-      await audio.play();
-    } catch (error) {
+    const audio = new Audio(recordingState.audioUrl);
+    audio.play().catch(error => {
       console.error('Failed to play audio:', error);
-      setPlayingRecording(null);
       updateRecordingState(sentenceId, slotIndex, { error: 'PLAYBACK_ERROR' });
-    }
-  }, [getRecordingState, updateRecordingState, playingRecording]);
-
-  // Handle stopping audio playback
-  const handleStopPlayback = useCallback(() => {
-    setPlayingRecording(null);
-  }, []);
+    });
+  }, [getRecordingState, updateRecordingState]);
 
   // Handle rating update
   const handleRateRecording = useCallback((sentenceId: number, slotIndex: number, score: number) => {
@@ -984,8 +947,6 @@ function PracticePageContent() {
                           onUploadRecording={() => handleUploadRecording(sentence.id, slotIndex)}
                           onDeleteRecording={() => handleDeleteRecording(sentence.id, slotIndex)}
                           hasPlayedOriginal={playedSentences.has(sentence.id)}
-                          isPlaying={playingRecording?.sentenceId === sentence.id && playingRecording?.slotIndex === slotIndex}
-                          onStopPlayback={handleStopPlayback}
                         />
 
                         {/* Rating Bar - shown below each recording button */}

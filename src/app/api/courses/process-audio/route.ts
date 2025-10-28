@@ -204,9 +204,9 @@ export async function POST(request: Request): Promise<Response> {
       WHERE course_id = ${courseId}
     `;
 
-    // Generate audio segments (placeholder for now)
+    // Generate audio segments using FFmpeg
     console.log('[process-audio] Generating audio segments...');
-    const audioSegments = await generateAudioSegments(audioUrl, sentences);
+    const audioSegments = await generateAudioSegments(audioUrl, courseId, sentences);
 
     // Insert sentences into database
     for (let i = 0; i < sentences.length; i++) {

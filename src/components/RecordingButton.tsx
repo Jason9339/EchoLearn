@@ -22,8 +22,6 @@ export default function RecordingButton({
   disabled = false,
   hasPlayedOriginal = false,
   showDetails = true,
-  isPlaying = false,
-  onStopPlayback,
 }: RecordingButtonProps) {
   const hasRecording = Boolean(recordingState.audioBlob || recordingState.audioUrl);
 
@@ -122,7 +120,7 @@ export default function RecordingButton({
     }
   };
 
-  // isPlaying is now passed as a prop from parent component
+  const isPlaying = false; // This would be managed by parent component
   const buttonState = getButtonState();
   const displayFileSize =
     recordingState.audioBlob?.size ?? recordingState.fileSize ?? null;
@@ -281,7 +279,7 @@ export default function RecordingButton({
               audioUrl={recordingState.audioUrl}
               isPlaying={isPlaying}
               onPlay={onPlayRecording}
-              onPause={onStopPlayback || (() => {})}
+              onPause={() => {}}
               className="text-xs"
             />
             {onUploadRecording && (

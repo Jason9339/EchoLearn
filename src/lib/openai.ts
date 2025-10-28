@@ -129,13 +129,15 @@ export function splitIntoSentences(
 
 /**
  * Generate audio segments from original audio file
- * Currently uses the original audio URL for all sentences as a temporary solution
+ * Uses FFmpeg for actual audio segmentation
  * @param originalAudioUrl - URL of the original audio file
+ * @param courseId - Course ID for organizing segmented files
  * @param sentences - Sentences with timing information
  * @returns URLs of generated audio segments
  */
 export async function generateAudioSegments(
   originalAudioUrl: string,
+  courseId: string,
   sentences: Array<{
     sentenceId: number;
     text: string;
@@ -146,23 +148,60 @@ export async function generateAudioSegments(
   sentenceId: number;
   audioUrl: string;
 }>> {
-  // TODO: Implement actual audio segmentation with ffmpeg
-  // This would require:
-  // 1. Download original audio file
-  // 2. Use ffmpeg or similar to extract segments based on startTime/endTime
-  // 3. Upload segments to Supabase Storage
-  // 4. Return URLs of uploaded segments
+  // Import audio segmentation service
+  const { segmentAndUploadAudio, checkFFmpegAvailability } = await import('@/lib/audio-segmentation');
 
-  console.log('Audio segmentation not yet implemented - using original audio for all sentences');
-  console.log('Original audio URL:', originalAudioUrl);
-  console.log('Sentences to segment:', sentences.length);
+  console.log('[openai] Starting audio segmentation process');
+  console.log('[openai] Original audio URL:', originalAudioUrl);
+  console.log('[openai] Sentences to segment:', sentences.length);
 
-  // Temporary solution: Use the original audio URL for all sentences
-  // This allows users to hear the full audio for each sentence
-  return sentences.map(sentence => ({
-    sentenceId: sentence.sentenceId,
-    audioUrl: originalAudioUrl, // Use original audio instead of placeholder
-  }));
+  try {
+    // Check if FFmpeg is available
+    const ffmpegAvailable = await checkFFmpegAvailability();
+    
+    if (!ffmpegAvailable) {
+      console.warn('[openai] FFmpeg not available, falling back to original audio');
+      // Fallback: Use original audio URL for all sentences
+      return sentences.map(sentence => ({
+        sentenceId: sentence.sentenceId,
+        audioUrl: originalAudioUrl,
+      }));
+    }
+
+    // Prepare segments for audio processing
+    const audioSegments = sentences.map(sentence => ({
+      sentenceId: sentence.sentenceId,
+      text: sentence.text,
+      startTime: sentence.startTime,
+      endTime: sentence.endTime,
+    }));
+
+    // Perform actual audio segmentation
+    console.log('[openai] Performing FFmpeg audio segmentation...');
+    const segmentedAudio = await segmentAndUploadAudio(
+      originalAudioUrl,
+      courseId,
+      audioSegments
+    );
+
+    // Convert to expected format
+    const result = segmentedAudio.map(segment => ({
+      sentenceId: segment.sentenceId,
+      audioUrl: segment.audioUrl,
+    }));
+
+    console.log(`[openai] Audio segmentation completed: ${result.length}/${sentences.length} segments created`);
+    return result;
+
+  } catch (error) {
+    console.error('[openai] Audio segmentation failed, falling back to original audio:', error);
+    
+    // Fallback: Use original audio URL for all sentences
+    return sentences.map(sentence => ({
+      sentenceId: sentence.sentenceId,
+      audioUrl: originalAudioUrl,
+    }));
+  }
 }
 
 /**

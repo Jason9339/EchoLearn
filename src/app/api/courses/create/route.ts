@@ -11,7 +11,13 @@ const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 async function processAudioInBackground(courseId: string, audioUrl: string): Promise<void> {
   try {
     // Get the base URL for internal API calls
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3001'; // Updated port
+    const baseUrl =
+      // Prefer explicit NextAuth URL in local/dev
+      process.env.NEXTAUTH_URL ||
+      // Vercel provides the deployment hostname without protocol
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ||
+      // Fallback to the current dev server port (default 3000)
+      `http://localhost:${process.env.PORT || 3000}`;
     
     // Call the process-audio API internally
     const response = await fetch(`${baseUrl}/api/courses/process-audio`, {

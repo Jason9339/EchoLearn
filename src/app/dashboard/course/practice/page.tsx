@@ -47,7 +47,8 @@ function PracticePageContent() {
   const [recordingStates, setRecordingStates] = useState<SentenceRecordingStates>({});
   const [playedSentences, setPlayedSentences] = useState<Set<number>>(new Set());
   const [ratings, setRatings] = useState<SentenceRatings>({});
-  const [customCourseData, setCustomCourseData] = useState<any>(null);
+  interface CustomCourseData { id: string; title: string; description: string }
+  const [customCourseData, setCustomCourseData] = useState<CustomCourseData | null>(null);
   const [customSentences, setCustomSentences] = useState<PracticeSentence[]>([]);
   const [loading, setLoading] = useState(isCustomCourse);
 
@@ -90,7 +91,8 @@ function PracticePageContent() {
           });
 
           // Convert course sentences to practice sentences format
-          const practiceFormat: PracticeSentence[] = statusData.sentences?.map((sentence: any) => ({
+          interface CourseSentenceApi { sentenceId: number; text: string; audioUrl?: string }
+          const practiceFormat: PracticeSentence[] = (statusData.sentences as CourseSentenceApi[] | undefined)?.map((sentence) => ({
             id: sentence.sentenceId,
             text: sentence.text,
             translation: '', // Custom courses don't have translations

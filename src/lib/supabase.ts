@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { createClient as createStorageClient } from '@supabase/storage-js';
 
 /**
  * Supabase client configuration
@@ -28,11 +27,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
  */
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-/**
- * Supabase Storage client for file operations
- * Uses service role key for direct storage access
- */
-export const supabaseStorage = createStorageClient(supabaseUrl, supabaseServiceKey);
 
 /**
  * Storage bucket names
@@ -47,7 +41,7 @@ export const STORAGE_BUCKETS = {
  */
 export async function initializeStorageBucket(): Promise<void> {
   try {
-    const { data, error } = await supabaseAdmin.storage.getBucket(STORAGE_BUCKETS.RECORDINGS);
+    const { data: _bucket, error } = await supabaseAdmin.storage.getBucket(STORAGE_BUCKETS.RECORDINGS);
     
     if (error && error.message.includes('not found')) {
       // Create bucket if it doesn't exist
@@ -92,7 +86,7 @@ export async function uploadAudioFile(
   } = {}
 ): Promise<{
   data: { path: string } | null;
-  error: any;
+  error: unknown;
   publicUrl?: string;
 }> {
   try {
@@ -132,8 +126,8 @@ export async function uploadAudioFile(
  * @returns Deletion result
  */
 export async function deleteAudioFile(filePath: string): Promise<{
-  data: any;
-  error: any;
+  data: unknown;
+  error: unknown;
 }> {
   try {
     const { data, error } = await supabaseAdmin.storage
@@ -157,7 +151,7 @@ export async function getSignedAudioUrl(
   expiresIn: number = 3600
 ): Promise<{
   data: { signedUrl: string } | null;
-  error: any;
+  error: unknown;
 }> {
   try {
     const { data, error } = await supabaseAdmin.storage

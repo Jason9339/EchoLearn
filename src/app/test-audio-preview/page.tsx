@@ -4,7 +4,8 @@ import { useState } from 'react';
 
 export default function TestAudioPreviewPage() {
   const [tempId, setTempId] = useState('');
-  const [audioInfo, setAudioInfo] = useState<any>(null);
+  type AudioInfo = { fileName: string; fileSize: number; audioUrl: string } | null;
+  const [audioInfo, setAudioInfo] = useState<AudioInfo>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

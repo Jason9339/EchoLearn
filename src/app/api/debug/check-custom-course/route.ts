@@ -64,7 +64,14 @@ export async function GET(request: Request): Promise<Response> {
     `;
 
     // Check course sentences for the latest course
-    let courseSentences = [];
+    interface CourseSentenceRow {
+      sentenceId: number;
+      text: string;
+      audioUrl: string | null;
+      startTime: number | null;
+      endTime: number | null;
+    }
+    let courseSentences: CourseSentenceRow[] = [];
     if (userCourses.length > 0) {
       const latestCourseId = userCourses[0].id;
       courseSentences = await sql`
@@ -95,7 +102,14 @@ export async function GET(request: Request): Promise<Response> {
     `;
 
     // Check recordings for custom courses
-    let customCourseRecordings = [];
+    interface RecordingRow {
+      id: string | number;
+      courseId: string | number;
+      sentenceId: number;
+      slotIndex: number;
+      audioUrl: string | null;
+    }
+    let customCourseRecordings: RecordingRow[] = [];
     if (userCourses.length > 0) {
       try {
         const latestCourseId = userCourses[0].id;

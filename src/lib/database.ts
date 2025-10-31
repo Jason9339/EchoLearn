@@ -201,8 +201,9 @@ export class RecordingService {
     const averageDuration = totalRecordings > 0 ? totalDuration / totalRecordings : 0;
     
     const recordingsByLabel = recordings.reduce(
-      (acc, rec) => {
-        acc[rec.label]++;
+      (acc: Record<'official' | 'test', number>, rec: { duration: number; label: string }) => {
+        const label: 'official' | 'test' = rec.label === 'test' ? 'test' : 'official';
+        acc[label] += 1;
         return acc;
       },
       { official: 0, test: 0 }

@@ -7,7 +7,17 @@ const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
  * GET /api/debug/check-database
  * Check if required database tables exist
  */
-export async function GET(request: Request): Promise<Response> {
+type TableCheck = { exists: boolean; error: string | null };
+type CheckResults = {
+  tables: Record<string, TableCheck>;
+  environment: {
+    postgresUrl: boolean;
+    supabaseUrl: boolean;
+    supabaseServiceKey: boolean;
+  };
+};
+
+export async function GET(_request: Request): Promise<Response> {
   const session = await auth();
 
   if (!session?.user?.id && !session?.user?.email) {
@@ -18,7 +28,7 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    const results = {
+    const results: CheckResults = {
       tables: {},
       environment: {
         postgresUrl: !!process.env.POSTGRES_URL,
@@ -56,7 +66,7 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     // Check if migration is needed
-    const migrationNeeded = newTables.some(table => !results.tables[table].exists);
+    const migrationNeeded = newTables.some(table => !results.tables[table]?.exists);
 
     return Response.json({
       success: true,

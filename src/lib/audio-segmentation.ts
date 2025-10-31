@@ -126,7 +126,7 @@ async function uploadSegmentedFiles(
       const fileName = `sentence_${file.sentenceId}.wav`;
       const storagePath = `course-segments/${courseId}/${fileName}`;
 
-      const { data, error } = await supabase.storage
+    const { data: _uploaded, error } = await supabase.storage
         .from('recordings')
         .upload(storagePath, fileBuffer, {
           contentType: 'audio/wav',
@@ -189,7 +189,7 @@ export async function segmentAndUploadAudio(
   courseId: string,
   segments: AudioSegment[]
 ): Promise<SegmentedAudio[]> {
-  let tempFiles: string[] = [];
+  const tempFiles: string[] = [];
 
   try {
     console.log(`[audio-segmentation] Starting audio segmentation for course: ${courseId}`);

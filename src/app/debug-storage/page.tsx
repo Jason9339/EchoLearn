@@ -4,7 +4,8 @@ import { useState } from 'react';
 
 export default function DebugStoragePage() {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  type DebugResult = unknown;
+  const [result, setResult] = useState<DebugResult>(null);
   const [tempId, setTempId] = useState('');
 
   const checkDatabase = async () => {
@@ -87,7 +88,7 @@ export default function DebugStoragePage() {
         </div>
       </div>
 
-      {result && (
+      {result !== null && (
         <div className="bg-gray-100 p-4 rounded-md">
           <h3 className="font-medium mb-2">結果：</h3>
           <pre className="text-sm overflow-auto">

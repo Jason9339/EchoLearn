@@ -212,10 +212,11 @@ export async function POST(request: Request): Promise<Response> {
     for (let i = 0; i < sentences.length; i++) {
       const sentence = sentences[i];
       const audioSegment = audioSegments.find(seg => seg.sentenceId === sentence.sentenceId);
-      
+      const audioUrlForInsert: string | null = audioSegment?.audioUrl ?? null;
+
       await sql`
         INSERT INTO course_sentences (course_id, sentence_id, text, audio_url, start_time, end_time)
-        VALUES (${courseId}, ${sentence.sentenceId}, ${sentence.text}, ${audioSegment?.audioUrl}, ${sentence.startTime}, ${sentence.endTime})
+        VALUES (${courseId}, ${sentence.sentenceId}, ${sentence.text}, ${audioUrlForInsert}, ${sentence.startTime}, ${sentence.endTime})
       `;
     }
 

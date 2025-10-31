@@ -104,6 +104,7 @@ export default function ProcessingPage() {
         } else {
           return '即將完成...';
     }
+    }
   };
 
   return (

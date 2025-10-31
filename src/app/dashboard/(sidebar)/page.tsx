@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
 import Carousel from "@/components/Carousel";
 
 export default function Page() {
@@ -22,8 +21,8 @@ export default function Page() {
         setCourseTutorialImages(data.courseTutorialImages);
         setRecordingTutorialImages(data.recordingTutorialImages);
         setPeerReviewTutorialImages(data.peerReviewTutorialImages);
-      } catch (e: any) {
-        setError(e.message);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "An unknown error occurred");
       } finally {
         setLoading(false);
       }

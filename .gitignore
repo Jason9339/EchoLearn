@@ -43,3 +43,11 @@ next-env.d.ts
 
 # python
 __pycache__/
+
+# cloudflare tunnel
+cloudflared-linux-amd64.deb
+*.deb
+
+# worker temp files
+/worker/temp/*
+!/worker/temp/.gitkeep

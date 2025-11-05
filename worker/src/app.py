@@ -1,10 +1,14 @@
-# app.py (Main Application File)
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), 'FreeVC'))
+
 from flask import Flask
 from flask_cors import CORS
 
 # 1. 從您的 routes 檔案 import 那個 blueprint
 from routes.example import example_worker_bp
 from routes.audio import audio_bp
+from routes.voice_conversion import voice_conversion_bp, load_models
 
 # 2. 建立 App
 app = Flask(__name__)
@@ -20,9 +24,12 @@ CORS(app, origins=cors_origins)
 
 app.register_blueprint(example_worker_bp, url_prefix='/worker')
 app.register_blueprint(audio_bp, url_prefix='/worker/audio')
+app.register_blueprint(voice_conversion_bp, url_prefix='/worker/voice-conversion')
 
 # 5. 啟動器
 if __name__ == '__main__':
+    with app.app_context():
+        load_models("src/FreeVC/configs/freevc.json", "src/FreeVC/checkpoints/freevc.pth")
     print("可用的路由:")
     print(app.url_map) # 這會印出所有已註冊的路由表，方便除錯
     app.run(host='0.0.0.0', port=5001, debug=True)

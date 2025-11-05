@@ -1,0 +1,2 @@
+worker/src/FreeVC/checkpoints/freevc.pth filter=lfs diff=lfs merge=lfs -text
+worker/src/FreeVC/wavlm/WavLM-Large.pt filter=lfs diff=lfs merge=lfs -text

@@ -1,0 +1,13 @@
+glob2==0.7
+tqdm==4.62.3
+librosa>=0.9.0
+scipy>=1.8.0
+numpy>=1.23.0
+tensorboard==2.7.0
+torch>=2.0.0
+torchvision>=0.15.0
+webrtcvad==2.0.10
+uvicorn
+fastapi
+flask
+flask-cors

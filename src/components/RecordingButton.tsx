@@ -1,8 +1,9 @@
 'use client';
 
-import { MicrophoneIcon, StopIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { MicrophoneIcon, StopIcon, CheckCircleIcon, TrashIcon } from '@heroicons/react/24/outline';
 import AudioPlayer from '@/components/AudioPlayer';
 import type { RecordingButtonProps, ButtonState } from '@/types/audio';
+import { MAX_RECORDING_DURATION_MS } from '@/types/audio';
 import { getAudioErrorMessage } from '@/app/lib/audio';
 
 /**
@@ -17,6 +18,7 @@ export default function RecordingButton({
   onStopRecording,
   onPlayRecording,
   onUploadRecording,
+  onDeleteRecording,
   disabled = false,
   hasPlayedOriginal = false,
   showDetails = true,
@@ -28,10 +30,11 @@ export default function RecordingButton({
     hasPlayedOriginal &&
     !recordingState.isRecording &&
     !recordingState.isUploading &&
+    !recordingState.isDeleting &&
     !hasRecording;
 
   const getButtonState = (): ButtonState => {
-    if (disabled) return 'disabled';
+    if (disabled || recordingState.isDeleting) return 'disabled';
     if (recordingState.isUploading) return 'uploading';
     if (recordingState.isRecording) return 'recording';
     if (hasRecording) return 'recorded';
@@ -77,38 +80,38 @@ export default function RecordingButton({
   };
 
   const handleClick = () => {
-    if (disabled) return;
+    if (disabled || recordingState.isDeleting) return;
     
     const state = getButtonState();
     
     // Debug logging
-    console.log('RecordingButton click:', {
-      slotIndex,
-      sentenceId,
-      state,
-      canStartRecording,
-      hasPlayedOriginal,
-      recordingState: {
-        isRecording: recordingState.isRecording,
-        audioBlob: !!recordingState.audioBlob,
-        audioUrl: !!recordingState.audioUrl,
-        isUploading: recordingState.isUploading,
-        error: recordingState.error
-      }
-    });
+    // console.log('RecordingButton click:', {
+    //   slotIndex,
+    //   sentenceId,
+    //   state,
+    //   canStartRecording,
+    //   hasPlayedOriginal,
+    //   recordingState: {
+    //     isRecording: recordingState.isRecording,
+    //     audioBlob: !!recordingState.audioBlob,
+    //     audioUrl: !!recordingState.audioUrl,
+    //     isUploading: recordingState.isUploading,
+    //     error: recordingState.error
+    //   }
+    // });
     
     switch (state) {
       case 'idle':
       case 'ready':
-        console.log('Calling onStartRecording...');
+        // console.log('Calling onStartRecording...');
         onStartRecording();
         break;
       case 'recording':
-        console.log('Calling onStopRecording...');
+        // console.log('Calling onStopRecording...');
         onStopRecording();
         break;
       case 'recorded':
-        console.log('Calling onStartRecording for re-record...');
+        // console.log('Calling onStartRecording for re-record...');
         onStartRecording(); // Start new recording to replace existing one
         break;
       case 'uploading':
@@ -124,10 +127,16 @@ export default function RecordingButton({
   const showUploadSuccess =
     !recordingState.audioBlob &&
     !!recordingState.audioUrl &&
-    !recordingState.isUploading;
+    !recordingState.isUploading &&
+    !recordingState.isDeleting;
 
   const handleUploadClick = () => {
-    if (!onUploadRecording || recordingState.isUploading || !recordingState.audioBlob) {
+    if (
+      !onUploadRecording ||
+      recordingState.isUploading ||
+      recordingState.isDeleting ||
+      !recordingState.audioBlob
+    ) {
       return;
     }
     onUploadRecording();
@@ -140,7 +149,11 @@ export default function RecordingButton({
         <button
           type="button"
           onClick={handleClick}
-          disabled={disabled || (recordingState.isUploading && !recordingState.isRecording)}
+          disabled={
+            disabled ||
+            recordingState.isDeleting ||
+            (recordingState.isUploading && !recordingState.isRecording)
+          }
           className={`
             relative w-16 h-16 rounded-full flex items-center justify-center
             transition-all duration-300 ease-in-out transform hover:scale-105
@@ -229,7 +242,7 @@ export default function RecordingButton({
                 strokeWidth="4"
                 fill="none"
                 strokeDasharray={`${2 * Math.PI * 28}`}
-                strokeDashoffset={`${2 * Math.PI * 28 * (1 - Math.min(recordingState.duration / 10000, 1))}`}
+                strokeDashoffset={`${2 * Math.PI * 28 * (1 - Math.min(recordingState.duration / MAX_RECORDING_DURATION_MS, 1))}`}
                 className="transition-all duration-100 ease-out"
               />
             </svg>
@@ -273,7 +286,11 @@ export default function RecordingButton({
               <button
                 type="button"
                 onClick={handleUploadClick}
-                disabled={recordingState.isUploading || !recordingState.audioBlob}
+                disabled={
+                  recordingState.isUploading ||
+                  recordingState.isDeleting ||
+                  !recordingState.audioBlob
+                }
                 className={`inline-flex items-center gap-2 px-3 py-1 text-xs font-medium rounded transition-colors ${
                   recordingState.isUploading
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -303,6 +320,49 @@ export default function RecordingButton({
                   </>
                 ) : (
                   <span>上傳錄音</span>
+                )}
+              </button>
+            )}
+            {onDeleteRecording && (
+              <button
+                type="button"
+                onClick={onDeleteRecording}
+                disabled={recordingState.isDeleting || recordingState.isUploading}
+                className={`inline-flex items-center gap-2 px-3 py-1 text-xs font-medium rounded border transition-colors ${
+                  recordingState.isDeleting || recordingState.isUploading
+                    ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-100'
+                    : 'border-red-200 text-red-600 hover:bg-red-50'
+                }`}
+              >
+                {recordingState.isDeleting ? (
+                  <>
+                    <svg
+                      className="h-3 w-3 animate-spin text-red-500"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    <span>刪除中...</span>
+                  </>
+                ) : (
+                  <>
+                    <TrashIcon className="h-3 w-3" />
+                    <span>刪除錄音</span>
+                  </>
                 )}
               </button>
             )}

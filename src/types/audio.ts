@@ -14,10 +14,14 @@ export interface RecordingState {
   audioUrl: string | null;
   /** Whether uploading to server */
   isUploading: boolean;
+  /** Whether a delete request is in progress */
+  isDeleting: boolean;
   /** Error message if any */
   error: string | null;
   /** File size in bytes (if known) */
   fileSize: number | null;
+  /** Server recording ID if persisted */
+  recordingId: string | null;
 }
 
 export interface UseAudioRecorderReturn {
@@ -34,6 +38,9 @@ export interface UseAudioRecorderReturn {
   /** Clear current recording */
   clearRecording: () => void;
 }
+
+/** Maximum duration for a single recording (milliseconds) */
+export const MAX_RECORDING_DURATION_MS = 15_000;
 
 export interface AudioPlayerProps {
   /** Audio URL to play */
@@ -73,6 +80,8 @@ export interface RecordingButtonProps {
   onPlayRecording: () => void;
   /** Upload recording callback */
   onUploadRecording?: () => void;
+  /** Delete recording callback */
+  onDeleteRecording?: () => void;
   /** Whether button is disabled */
   disabled?: boolean;
   /** Whether the sentence has been played */

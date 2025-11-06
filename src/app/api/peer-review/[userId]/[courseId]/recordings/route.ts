@@ -64,7 +64,12 @@ export async function GET(
         r.duration,
         r.file_size as "fileSize",
         r.created_at as "createdAt",
-        rat.score as "myRating"
+        rat.score as "myRating",
+        (
+          SELECT COUNT(*)
+          FROM ratings rat_all
+          WHERE rat_all.recording_id = r.id
+        ) as "ratingCount"
       FROM recordings r
       LEFT JOIN ratings rat ON rat.recording_id = r.id AND rat.rater_user_id::text = ${normalizedCurrentUserId}
       WHERE r.user_id::text = ${targetUserId}
@@ -86,6 +91,7 @@ export async function GET(
         fileSize: rec.fileSize,
         createdAt: rec.createdAt,
         myRating: rec.myRating || null,
+        ratingCount: Number(rec.ratingCount) || 0,
       })),
     });
   } catch (e) {

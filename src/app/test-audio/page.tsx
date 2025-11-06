@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import AudioPlayer from '@/components/AudioPlayer';
+import { MAX_RECORDING_DURATION_MS } from '@/types/audio';
 
 /**
  * Test page for audio recording functionality
@@ -11,6 +12,7 @@ import AudioPlayer from '@/components/AudioPlayer';
 export default function AudioTestPage() {
   const { recordingState, startRecording, stopRecording, playRecording, clearRecording } = useAudioRecorder();
   const [isPlaying, setIsPlaying] = useState(false);
+  const maxRecordingSeconds = Math.floor(MAX_RECORDING_DURATION_MS / 1000);
 
   const handlePlay = () => {
     setIsPlaying(true);
@@ -29,7 +31,7 @@ export default function AudioTestPage() {
 
   const getButtonText = (): string => {
     if (recordingState.isRecording) {
-      const remainingSeconds = Math.max(0, 10 - Math.floor(recordingState.duration / 1000));
+      const remainingSeconds = Math.max(0, maxRecordingSeconds - Math.floor(recordingState.duration / 1000));
       return `錄音中... ${remainingSeconds}s`;
     }
     if (recordingState.audioBlob) return '重新錄音';
@@ -135,7 +137,7 @@ export default function AudioTestPage() {
           <h3 className="text-lg font-semibold text-blue-900 mb-2">使用說明</h3>
           <ul className="text-sm text-blue-800 space-y-1">
             <li>• 點擊「開始錄音」按鈕開始錄音</li>
-            <li>• 錄音會自動在 10 秒後停止</li>
+            <li>• 錄音會自動在 {maxRecordingSeconds} 秒後停止</li>
             <li>• 也可以手動點擊「停止錄音」按鈕</li>
             <li>• 錄音完成後可以使用播放器播放</li>
             <li>• 點擊「清除錄音」可以重新開始</li>

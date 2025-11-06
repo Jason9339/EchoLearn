@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
@@ -8,6 +8,8 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   UserIcon,
+  PlayIcon,
+  PauseIcon,
 } from '@heroicons/react/24/outline';
 import AudioPlayer from '@/components/AudioPlayer';
 import { practiceSentences } from '@/app/lib/placeholder-data';
@@ -22,6 +24,7 @@ interface Recording {
   fileSize: number;
   createdAt: string;
   myRating: number | null;
+  ratingCount: number;
 }
 
 /**
@@ -132,10 +135,18 @@ export default function PeerReviewRatingPage() {
   const [ratings, setRatings] = useState<{ [key: string]: number }>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [playingAudio, setPlayingAudio] = useState<'original' | 'user' | null>(null);
+  const [playingAudio, setPlayingAudio] = useState<'original' | 'user' | 'both' | null>(null);
+  const [hideFullyRated, setHideFullyRated] = useState(false);
+
+  const visibleRecordings = useMemo(() => {
+    if (!hideFullyRated) {
+      return recordings;
+    }
+    return recordings.filter((rec) => rec.ratingCount < 3);
+  }, [hideFullyRated, recordings]);
 
   // Get current recording and sentence data
-  const currentRecording = recordings[currentIndex];
+  const currentRecording = visibleRecordings[currentIndex];
   const sentences = practiceSentences[courseId] || [];
   const sentence = currentRecording ? sentences.find(s => s.id === currentRecording.sentenceId) : undefined;
 
@@ -184,26 +195,59 @@ export default function PeerReviewRatingPage() {
     fetchRecordings();
   }, [userId, courseId]);
 
+  useEffect(() => {
+    if (visibleRecordings.length === 0) {
+      if (currentIndex !== 0) {
+        setCurrentIndex(0);
+      }
+      return;
+    }
+
+    if (currentIndex >= visibleRecordings.length) {
+      setCurrentIndex(visibleRecordings.length - 1);
+    }
+  }, [visibleRecordings.length, currentIndex]);
+
   const handlePrevious = useCallback(() => {
     if (currentIndex > 0) {
       setPlayingAudio(null); // Stop any playing audio
-      setCurrentIndex(currentIndex - 1);
+      setCurrentIndex((prev) => prev - 1);
     }
   }, [currentIndex]);
 
   const handleNext = useCallback(() => {
-    if (currentIndex < recordings.length - 1) {
+    if (currentIndex < visibleRecordings.length - 1) {
       setPlayingAudio(null); // Stop any playing audio
-      setCurrentIndex(currentIndex + 1);
+      setCurrentIndex((prev) => prev + 1);
     }
-  }, [currentIndex, recordings.length]);
+  }, [currentIndex, visibleRecordings.length]);
 
   const handleRate = useCallback(async (recordingId: string, score: number) => {
+    const targetRecording = recordings.find(rec => rec.id === recordingId);
+    const previousMyRating = targetRecording?.myRating ?? null;
+    const previousRatingCount = targetRecording?.ratingCount ?? 0;
+    const hadExistingRating =
+      ratings[recordingId] !== undefined || previousMyRating !== null;
+
     // Optimistically update UI
     setRatings(prev => ({
       ...prev,
       [recordingId]: score,
     }));
+
+    if (targetRecording) {
+      setRecordings(prev =>
+        prev.map(rec =>
+          rec.id === recordingId
+            ? {
+                ...rec,
+                myRating: score,
+                ratingCount: hadExistingRating ? previousRatingCount : previousRatingCount + 1,
+              }
+            : rec
+        )
+      );
+    }
 
     try {
       // Submit rating to peer review API
@@ -232,16 +276,50 @@ export default function PeerReviewRatingPage() {
       // Revert optimistic update on error
       setRatings(prev => {
         const newRatings = { ...prev };
-        delete newRatings[recordingId];
+        if (hadExistingRating && previousMyRating !== null) {
+          newRatings[recordingId] = previousMyRating;
+        } else {
+          delete newRatings[recordingId];
+        }
         return newRatings;
       });
+      if (targetRecording) {
+        setRecordings(prev =>
+          prev.map(rec =>
+            rec.id === recordingId
+              ? {
+                  ...rec,
+                  myRating: previousMyRating,
+                  ratingCount: previousRatingCount,
+                }
+              : rec
+          )
+        );
+      }
     }
-  }, []);
+  }, [recordings, ratings]);
+
+  const handlePlayBoth = useCallback(() => {
+    if (!sentence?.audioSrc || !currentRecording?.audioUrl) {
+      return;
+    }
+
+    setPlayingAudio(prev => (prev === 'both' ? null : 'both'));
+  }, [sentence?.audioSrc, currentRecording?.audioUrl]);
+
+  useEffect(() => {
+    setPlayingAudio(null);
+  }, [currentRecording?.id]);
 
   // Calculate progress
-  const ratedCount = Object.keys(ratings).length;
-  const totalCount = recordings.length;
+  const ratedCount = visibleRecordings.reduce(
+    (count, recording) => (ratings[recording.id] !== undefined ? count + 1 : count),
+    0
+  );
+  const totalCount = visibleRecordings.length;
   const progressPercentage = totalCount > 0 ? Math.round((ratedCount / totalCount) * 100) : 0;
+  const hasVisibleRecordings = totalCount > 0;
+  const filteredOutCount = recordings.length - totalCount;
 
   if (isLoading) {
     return (
@@ -306,7 +384,14 @@ export default function PeerReviewRatingPage() {
           {/* Info */}
           <div className="flex-1">
             <h1 className="text-xl font-semibold text-gray-900">評分 - {userName}</h1>
-            <p className="text-sm text-gray-600">{sentence?.text || (currentRecording ? `Sentence ${currentRecording.sentenceId}` : '載入中...')}</p>
+            <p className="text-sm text-gray-600">
+              {sentence?.text ||
+                (currentRecording
+                  ? `Sentence ${currentRecording.sentenceId}`
+                  : hideFullyRated
+                    ? '目前沒有符合過濾條件的錄音'
+                    : '載入中...')}
+            </p>
           </div>
 
           {/* Progress Badge */}
@@ -331,13 +416,28 @@ export default function PeerReviewRatingPage() {
 
       {/* Navigation Info */}
       <div className="rounded-xl bg-[#476EAE]/5 p-4">
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
           <span className="text-gray-600">
-            錄音 {currentIndex + 1} / {recordings.length}
+            錄音 {hasVisibleRecordings ? currentIndex + 1 : 0} / {totalCount}
           </span>
-          <span className="text-gray-600">
-            槽位 {currentRecording?.slotIndex + 1}
-          </span>
+          <div className="flex flex-wrap items-center gap-3">
+            {hideFullyRated && filteredOutCount > 0 && (
+              <span className="text-xs text-gray-500">
+                已隱藏 {filteredOutCount} 個錄音
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setHideFullyRated(prev => !prev)}
+              className={`rounded-md border px-4 py-2 text-sm font-medium transition ${
+                hideFullyRated
+                  ? 'border-[#476EAE] bg-[#476EAE] text-white hover:bg-[#5A85C9]'
+                  : 'border-[#476EAE] text-[#476EAE] hover:bg-[#476EAE]/10'
+              }`}
+            >
+              {hideFullyRated ? '顯示所有錄音' : '過濾滿 3 次評分'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -354,7 +454,7 @@ export default function PeerReviewRatingPage() {
 
       {/* Main Rating Card */}
       <div className="rounded-xl border bg-white p-8 shadow-sm">
-        {currentRecording && (
+        {currentRecording ? (
           <div className="space-y-6">
             {/* Sentence Text */}
             {sentence && (
@@ -377,9 +477,13 @@ export default function PeerReviewRatingPage() {
                     <div className="flex justify-center">
                       <AudioPlayer
                         audioUrl={sentence.audioSrc}
-                        isPlaying={playingAudio === 'original'}
+                        isPlaying={playingAudio === 'original' || playingAudio === 'both'}
                         onPlay={() => setPlayingAudio('original')}
-                        onPause={() => setPlayingAudio(null)}
+                        onPause={() =>
+                          setPlayingAudio(prev =>
+                            prev === 'original' || prev === 'both' ? null : prev
+                          )
+                        }
                         className="flex justify-center"
                       />
                     </div>
@@ -400,9 +504,13 @@ export default function PeerReviewRatingPage() {
                 <div className="flex justify-center">
                   <AudioPlayer
                     audioUrl={currentRecording.audioUrl}
-                    isPlaying={playingAudio === 'user'}
+                    isPlaying={playingAudio === 'user' || playingAudio === 'both'}
                     onPlay={() => setPlayingAudio('user')}
-                    onPause={() => setPlayingAudio(null)}
+                    onPause={() =>
+                      setPlayingAudio(prev =>
+                        prev === 'user' || prev === 'both' ? null : prev
+                      )
+                    }
                     className="flex justify-center"
                   />
                 </div>
@@ -411,6 +519,31 @@ export default function PeerReviewRatingPage() {
                 </div>
               </div>
             </div>
+            {sentence?.audioSrc && currentRecording?.audioUrl && (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={handlePlayBoth}
+                  className={`inline-flex items-center gap-2 rounded-lg border-2 px-4 py-2 text-sm font-medium transition ${
+                    playingAudio === 'both'
+                      ? 'border-[#41A67E] bg-[#41A67E] text-white hover:bg-[#349269]'
+                      : 'border-[#476EAE] text-[#476EAE] hover:bg-[#476EAE] hover:text-white'
+                  }`}
+                >
+                  {playingAudio === 'both' ? (
+                    <>
+                      <PauseIcon className="h-5 w-5" />
+                      停止同時播放
+                    </>
+                  ) : (
+                    <>
+                      <PlayIcon className="h-5 w-5" />
+                      同時播放
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
 
             {/* Rating Section */}
             <div className="border-t pt-6">
@@ -422,55 +555,57 @@ export default function PeerReviewRatingPage() {
                 isLocked={false}
                 initialRating={ratings[currentRecording.id] || null}
                 onRate={(score) => handleRate(currentRecording.id, score)}
-                className="mb-4"
+                className="mb-2"
               />
 
-              {ratings[currentRecording.id] && (
-                <div className="text-center">
+              <div className="flex flex-col items-center gap-2">
+                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                  currentRecording.ratingCount >= 3
+                    ? 'bg-green-100 text-green-700'
+                    : currentRecording.ratingCount >= 2
+                      ? 'bg-yellow-100 text-yellow-700'
+                      : 'bg-gray-100 text-gray-600'
+                }`}>
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  {currentRecording.ratingCount} / 3 人已評分
+                </span>
+
+                {ratings[currentRecording.id] && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-[#476EAE]/10 px-3 py-1 text-sm text-[#476EAE]">
                     <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                     已評分
                   </span>
-                </div>
-              )}
+                )}
+              </div>
             </div>
+          </div>
+        ) : (
+          <div className="text-center text-sm text-gray-600">
+            {hideFullyRated
+              ? '所有錄音都已達 3 次評分，關閉過濾即可檢視完整列表。'
+              : '目前沒有可顯示的錄音。'}
           </div>
         )}
       </div>
 
       {/* Navigation Buttons */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-center gap-4">
         <button
           onClick={handlePrevious}
-          disabled={currentIndex === 0}
+          disabled={!hasVisibleRecordings || currentIndex === 0}
           className="flex items-center gap-2 rounded-lg border-2 border-[#476EAE] px-6 py-3 font-medium text-[#476EAE] transition hover:bg-[#476EAE] hover:text-white disabled:border-gray-300 disabled:text-gray-300 disabled:hover:bg-transparent"
         >
           <ChevronLeftIcon className="h-5 w-5" />
           上一個
         </button>
 
-        <div className="text-center text-sm text-gray-600">
-          <div className="flex gap-1">
-            {recordings.map((rec, idx) => (
-              <div
-                key={rec.id}
-                className={`h-2 w-2 rounded-full ${
-                  idx === currentIndex
-                    ? 'bg-[#476EAE]'
-                    : ratings[rec.id]
-                      ? 'bg-[#A7E399]'
-                      : 'bg-gray-300'
-                }`}
-              />
-            ))}
-          </div>
-        </div>
-
         <button
           onClick={handleNext}
-          disabled={currentIndex === recordings.length - 1}
+          disabled={!hasVisibleRecordings || currentIndex === totalCount - 1}
           className="flex items-center gap-2 rounded-lg border-2 border-[#476EAE] px-6 py-3 font-medium text-[#476EAE] transition hover:bg-[#476EAE] hover:text-white disabled:border-gray-300 disabled:text-gray-300 disabled:hover:bg-transparent"
         >
           下一個
@@ -482,7 +617,7 @@ export default function PeerReviewRatingPage() {
       <div className="rounded-xl bg-white p-4 shadow-sm">
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
-            <p className="text-sm text-gray-600">總計</p>
+            <p className="text-sm text-gray-600">可評錄音</p>
             <p className="text-xl font-bold text-gray-900">{totalCount}</p>
           </div>
           <div>

@@ -99,25 +99,127 @@ file.save(file_path)
 result = transcribe_audio(file_path, language)
 ```
 
-### Step 5: 測試 API
+### Step 4: 撰寫測試檔案
+
+在 `tests/` 資料夾中新增測試檔案來測試你的 service 函數：
+
+**範例：`tests/test_audio_service.py`**
+
+```python
+"""
+測試語音處理服務
+"""
+import os
+import sys
+
+# 添加 src 到路徑，讓我們可以 import service
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../src'))
+
+from services.audio_service import transcribe_audio, analyze_pronunciation
+
+
+def test_transcribe_audio():
+    """測試語音轉文字功能"""
+    print("=== 測試語音轉文字 ===")
+
+    # 使用 temp 資料夾中的測試音檔
+    test_audio_path = os.path.join(os.path.dirname(__file__), '../temp/test_audio.wav')
+
+    if not os.path.exists(test_audio_path):
+        print(f"⚠️  測試音檔不存在: {test_audio_path}")
+        print("請先將測試音檔放入 worker/temp/ 資料夾")
+        return
+
+    # 呼叫你實作的 function
+    result = transcribe_audio(test_audio_path, language='en')
+
+    # 輸出結果
+    print(f"✅ 轉錄文字: {result['text']}")
+    print(f"✅ 信心度: {result['confidence']}")
+    print()
+
+
+def test_analyze_pronunciation():
+    """測試發音評分功能"""
+    print("=== 測試發音評分 ===")
+
+    test_audio_path = os.path.join(os.path.dirname(__file__), '../temp/test_pronunciation.wav')
+    reference_text = "Hello, how are you?"
+
+    if not os.path.exists(test_audio_path):
+        print(f"⚠️  測試音檔不存在: {test_audio_path}")
+        return
+
+    # 呼叫你實作的 function
+    result = analyze_pronunciation(test_audio_path, reference_text, language='en')
+
+    # 輸出結果
+    print(f"✅ 總分: {result['score']}")
+    print(f"✅ 準確度: {result['feedback']['accuracy']}")
+    print(f"✅ 流暢度: {result['feedback']['fluency']}")
+    print(f"✅ 完整度: {result['feedback']['completeness']}")
+    print()
+
+
+if __name__ == '__main__':
+    # 執行測試
+    test_transcribe_audio()
+    test_analyze_pronunciation()
+    print("✅ 所有測試完成")
+```
+
+**執行測試：**
+
+```bash
+cd worker
+source .venv/bin/activate
+python tests/test_audio_service.py
+```
+
+**測試音檔準備：**
+- 將測試用的音檔放在 `worker/temp/` 資料夾
+- 例如：`worker/temp/test_audio.wav`, `worker/temp/test_pronunciation.wav`
+- temp 資料夾已經在 .gitignore 中，不會被提交
+
+### Step 5: 完善 Routes 層（選擇性）
+
+**注意：Routes 層已經由後端架設者處理好，一般情況下你不需要修改**
+
+如果需要調整 API 參數，可以在 [src/routes/audio.py](src/routes/audio.py) 中修改：
+
+```python
+# 儲存上傳的檔案
+import os
+from werkzeug.utils import secure_filename
+
+file_path = os.path.join('temp', secure_filename(file.filename))
+file.save(file_path)
+
+# 呼叫 service 層
+result = transcribe_audio(file_path, language)
+```
+
+### Step 6: 測試 API（選擇性）
+
+**注意：這一步是測試完整的 HTTP API，通常由後端架設者負責**
 
 ```bash
 # 啟動服務
-cd /home/jason/EchoLearn/worker
+cd worker
 source .venv/bin/activate
-python3 src/app.py
+python src/app.py
 
 # 測試健康檢查
 curl http://localhost:5001/worker/audio/health
 
 # 測試語音轉文字
 curl -X POST http://localhost:5001/worker/audio/transcribe \
-  -F "file=@test.mp3" \
+  -F "file=@temp/test.wav" \
   -F "language=en"
 
 # 測試發音評分
 curl -X POST http://localhost:5001/worker/audio/pronunciation \
-  -F "file=@test.mp3" \
+  -F "file=@temp/test.wav" \
   -F "reference_text=Hello world" \
   -F "language=en"
 ```

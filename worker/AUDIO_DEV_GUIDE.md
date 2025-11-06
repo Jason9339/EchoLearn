@@ -25,21 +25,51 @@ worker/
 - **Routes 層** ([src/routes/audio.py](src/routes/audio.py)): 處理 HTTP 請求、參數驗證、回應格式化
 - **Services 層** ([src/services/audio_service.py](src/services/audio_service.py)): 核心業務邏輯、API 整合
 
+## 已實作功能
+
+### Voice Conversion (語音轉換) ✅
+- **端點**: `POST /worker/voice-conversion/convert`
+- **功能**: 將來源音訊的聲音轉換成目標說話者的聲音
+- **工具**: FreeVC
+- **狀態**: 已完成
+
+**測試範例：**
+```bash
+# 測試語音轉換
+curl -X POST http://localhost:5001/worker/voice-conversion/convert \
+  -F "source_audio=@temp/source.wav" \
+  -F "target_audio=@temp/target.wav" \
+  -o converted_output.wav
+
+# 檢查輸出檔案
+file converted_output.wav
+# 輸出: RIFF (little-endian) data, WAVE audio, IEEE Float, mono 16000 Hz
+```
+
 ## 語音功能模板
 
 ### 1. 語音轉文字 (Speech-to-Text)
 - **端點**: `POST /worker/audio/transcribe`
 - **功能**: 將音訊檔案轉換為文字
 - **建議工具**: OpenAI Whisper API
+- **狀態**: 待實作
 
 ### 2. 發音評分 (Pronunciation Assessment)
 - **端點**: `POST /worker/audio/pronunciation`
 - **功能**: 分析發音並給予評分回饋
 - **建議工具**: Azure Speech Service
+- **狀態**: 待實作
 
 ### 3. 健康檢查
 - **端點**: `GET /worker/audio/health`
 - **功能**: 檢查服務狀態
+- **狀態**: 已實作
+
+**測試範例：**
+```bash
+# 測試健康檢查
+curl http://localhost:5001/worker/audio/health
+```
 
 ## 如何開始實作
 

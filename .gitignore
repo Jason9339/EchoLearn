@@ -51,3 +51,9 @@ cloudflared-linux-amd64.deb
 # worker temp files
 /worker/temp/*
 !/worker/temp/.gitkeep
+
+# AI tools
+GEMINI.md
+.gemini/
+CLAUDE.md
+.claude/

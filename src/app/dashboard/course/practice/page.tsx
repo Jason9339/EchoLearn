@@ -55,6 +55,9 @@ function PracticePageContent() {
   const mediaRecordersRef = useRef<Record<string, MediaRecorder>>({});
   const cleanupFunctionsRef = useRef<Record<string, () => void>>({});
 
+  // Use ref to store currently playing audio to prevent overlapping playback
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+
   const currentCourse = courses.find((course) => course.id === courseId);
   const sentences: PracticeSentence[] = useMemo(
     () => practiceSentences[courseId] ?? [],
@@ -142,6 +145,14 @@ function PracticePageContent() {
       }
     });
     Object.values(cleanupFunctionsRef.current).forEach(cleanup => cleanup());
+
+    // Stop any currently playing audio when switching courses
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.currentTime = 0;
+      currentAudioRef.current = null;
+    }
+
     mediaRecordersRef.current = {};
     cleanupFunctionsRef.current = {};
     setRecordingStates({});
@@ -306,12 +317,18 @@ function PracticePageContent() {
           recorder.stop();
         }
       });
-      
+
       // Call all cleanup functions
       Object.values(cleanupFunctionsRef.current).forEach(cleanup => {
         cleanup();
       });
-      
+
+      // Stop any currently playing audio
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
+
       // Clear refs
       mediaRecordersRef.current = {};
       cleanupFunctionsRef.current = {};
@@ -327,14 +344,39 @@ function PracticePageContent() {
   const handlePlay = (sentence: PracticeSentence) => {
     if (typeof window === 'undefined') return;
 
+    // Stop any currently playing audio to prevent overlapping
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.currentTime = 0;
+      currentAudioRef.current = null;
+    }
+
     // Immediately mark sentence as played when user clicks play button
     setPlayedSentences(prev => new Set(prev).add(sentence.id));
 
     // Play the actual audio file
     if (sentence.audioSrc) {
       const audio = new Audio(sentence.audioSrc);
+      currentAudioRef.current = audio;
+
+      // Clear ref when audio finishes or encounters an error
+      audio.onended = () => {
+        if (currentAudioRef.current === audio) {
+          currentAudioRef.current = null;
+        }
+      };
+
+      audio.onerror = () => {
+        if (currentAudioRef.current === audio) {
+          currentAudioRef.current = null;
+        }
+      };
+
       audio.play().catch(error => {
         console.error('Failed to play audio:', error);
+        if (currentAudioRef.current === audio) {
+          currentAudioRef.current = null;
+        }
       });
     }
   };
@@ -567,10 +609,35 @@ function PracticePageContent() {
     const recordingState = getRecordingState(sentenceId, slotIndex);
     if (!recordingState.audioUrl) return;
 
+    // Stop any currently playing audio to prevent overlapping
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.currentTime = 0;
+      currentAudioRef.current = null;
+    }
+
     const audio = new Audio(recordingState.audioUrl);
+    currentAudioRef.current = audio;
+
+    // Clear ref when audio finishes or encounters an error
+    audio.onended = () => {
+      if (currentAudioRef.current === audio) {
+        currentAudioRef.current = null;
+      }
+    };
+
+    audio.onerror = () => {
+      if (currentAudioRef.current === audio) {
+        currentAudioRef.current = null;
+      }
+    };
+
     audio.play().catch(error => {
       console.error('Failed to play audio:', error);
       updateRecordingState(sentenceId, slotIndex, { error: 'PLAYBACK_ERROR' });
+      if (currentAudioRef.current === audio) {
+        currentAudioRef.current = null;
+      }
     });
   }, [getRecordingState, updateRecordingState]);
 

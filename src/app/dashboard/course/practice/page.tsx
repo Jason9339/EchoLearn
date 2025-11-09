@@ -246,7 +246,7 @@ function PracticePageContent() {
 
     const loadRatings = async () => {
       try {
-        const response = await fetch('/api/ratings', {
+        const response = await fetch(`/api/ratings?courseId=${encodeURIComponent(courseId)}`, {
           credentials: 'include',
           signal: controller.signal,
         });

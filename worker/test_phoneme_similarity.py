@@ -5,6 +5,7 @@
 """
 
 import sys
+import tempfile
 from pathlib import Path
 
 # 確保可以 import services
@@ -14,11 +15,15 @@ from services.phoneme_ctc import PhoneCTC
 from services.phoneme_per import calculate_per_similarity
 from services.phoneme_gop import calculate_gop_similarity
 from services.phoneme_ppg import calculate_ppg_similarity
+from services.preprocessing import preprocess_pipeline
 
 # 音檔路徑
 AUDIO_DIR = Path(__file__).parent.parent / "public" / "audio"
 BDL_DIR = AUDIO_DIR / "cmu_us_bdl_arctic"  # 說話者 1 (男聲)
 CLB_DIR = AUDIO_DIR / "cmu_us_clb_arctic"  # 說話者 2 (女聲)
+
+# 是否使用前處理（降噪）
+USE_PREPROCESSING = True
 
 
 def test_case(name: str, audio_a: Path, audio_b: Path, ctc: PhoneCTC):
@@ -30,10 +35,29 @@ def test_case(name: str, audio_a: Path, audio_b: Path, ctc: PhoneCTC):
     print(f"{'-' * 60}")
 
     try:
-        # 計算三種相似度
-        per = calculate_per_similarity(str(audio_a), str(audio_b), ctc=ctc)
-        gop = calculate_gop_similarity(str(audio_a), str(audio_b), ctc=ctc)
-        ppg = calculate_ppg_similarity(str(audio_a), str(audio_b), ctc=ctc)
+        # 前處理：降噪（如果啟用）
+        if USE_PREPROCESSING:
+            print("🔧 正在進行前處理（DeepFilterNet 降噪）...")
+            with tempfile.TemporaryDirectory() as tmpdir:
+                # 預處理音檔 A
+                processed_a = Path(tmpdir) / f"processed_a_{audio_a.name}"
+                preprocess_pipeline(audio_a, processed_a, use_deepfilter=True)
+
+                # 預處理音檔 B
+                processed_b = Path(tmpdir) / f"processed_b_{audio_b.name}"
+                preprocess_pipeline(audio_b, processed_b, use_deepfilter=True)
+
+                print("✅ 前處理完成")
+
+                # 使用處理後的音檔計算相似度
+                per = calculate_per_similarity(str(processed_a), str(processed_b), ctc=ctc)
+                gop = calculate_gop_similarity(str(processed_a), str(processed_b), ctc=ctc)
+                ppg = calculate_ppg_similarity(str(processed_a), str(processed_b), ctc=ctc)
+        else:
+            # 直接使用原始音檔計算相似度
+            per = calculate_per_similarity(str(audio_a), str(audio_b), ctc=ctc)
+            gop = calculate_gop_similarity(str(audio_a), str(audio_b), ctc=ctc)
+            ppg = calculate_ppg_similarity(str(audio_a), str(audio_b), ctc=ctc)
 
         print(f"PER 相似度: {per:.4f}")
         print(f"GOP 相似度: {gop:.4f}")
@@ -42,12 +66,18 @@ def test_case(name: str, audio_a: Path, audio_b: Path, ctc: PhoneCTC):
         return {"per": per, "gop": gop, "ppg": ppg}
     except Exception as e:
         print(f"❌ 錯誤: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
 def main():
     print("=" * 60)
     print("音素相似度功能自測")
+    if USE_PREPROCESSING:
+        print("模式: 使用 DeepFilterNet 前處理（降噪）")
+    else:
+        print("模式: 不使用前處理（原始音檔）")
     print("=" * 60)
 
     # 檢查音檔目錄

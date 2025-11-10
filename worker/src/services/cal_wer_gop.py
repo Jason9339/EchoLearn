@@ -1,20 +1,27 @@
 import hashlib
 import math
+import os
 import string
 import time
-from io import BytesIO
 from pathlib import Path
+from typing import Optional, Tuple, Union
 
-import librosa
-import noisereduce as nr
+_WORKER_ROOT = Path(__file__).resolve().parents[2]
+_CACHE_HOME = _WORKER_ROOT / "temp" / "cache"
+_WHISPER_CACHE_DIR = _CACHE_HOME / "whisper"
+os.environ.setdefault("XDG_CACHE_HOME", str(_CACHE_HOME))
+os.environ.setdefault("WHISPER_CACHE_DIR", str(_WHISPER_CACHE_DIR))
+_WHISPER_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
 import numpy as np
-import soundfile as sf
 import torch
 import torchaudio
 import whisper
-from pydub import AudioSegment, effects, silence
 from torch.nn import functional as F
-from tqdm import tqdm
+
+from services.preprocessing import preprocess_pipeline
+
+PathLike = Union[str, Path]
 
 #########################################################
 #- To preprocess audio, call read_or_create_preprocessed_audio(source_path, cache_dir)
@@ -60,12 +67,13 @@ def cal_wer(reference: str, hypothesis: str) -> float:
 
 
 def get_wer_score(
-    test_audio_path: str,
-    ground_truth_audio_path: str,
+    test_audio_path: PathLike,
+    ground_truth_audio_path: PathLike,
     *,
     gt_transcript: bool = False,
-    ground_truth_transcript_path: str | Path | None = None,
-) -> float:
+    ground_truth_transcript_path: Optional[PathLike] = None,
+    return_transcripts: bool = False,
+) -> Union[float, Tuple[float, str, str]]:
     """Return WER using test audio and either ground-truth audio or a provided transcript."""
 
     test_path = Path(test_audio_path)
@@ -81,9 +89,9 @@ def get_wer_score(
     model = whisper.load_model("base", device="cpu")
 
     test_result = model.transcribe(str(test_path), fp16=False)
-
+    test_text_raw = test_result["text"].strip()
     # Normalize transcripts to emphasize lexical differences only
-    test_text = _normalize_text(test_result["text"].strip())
+    test_text = _normalize_text(test_text_raw)
 
     if gt_transcript:
         # Load ground truth text from the provided transcript file instead of transcribing audio
@@ -105,7 +113,10 @@ def get_wer_score(
 
     # Return WER between predicted and reference text
     wer = cal_wer(gt_text, test_text)
-    return float(f"{wer:.4f}")
+    wer_value = float(f"{wer:.4f}")
+    if return_transcripts:
+        return wer_value, test_text_raw, gt_text_raw
+    return wer_value
 
 
 ##### helpers for GOP #####
@@ -285,82 +296,35 @@ def get_gop_score(test_audio_path: str, ground_truth_audio_path: str, alignment:
 
 ##### helpers for audio preprocessing #####
 def preprocess_audio(
-    input_path: str | Path,
-    output_path: str | Path,
+    input_path: PathLike,
+    output_path: PathLike,
     sample_rate: int = 16000,
     silence_threshold: int = -40,
+    target_peak_dbfs: float = -3.0,
+    target_lufs: float = -16.0,
+    use_deepfilter: bool = True,
 ) -> float:
-    """Denoise, normalize, trim silence, and export a cleaned wav file."""
+    """Run the shared preprocessing pipeline and report elapsed time."""
 
     start_time = time.time()
-    input_path = Path(input_path)
-    output_path = Path(output_path)
+    # `silence_threshold` is kept for backward compatibility; trimming is handled inside the pipeline.
+    _ = silence_threshold
 
-    steps = 5
-    with tqdm(total=steps, desc="Preprocessing audio", unit="step") as progress:
-        # Load waveform as mono at the target sample rate
-        audio, sr = librosa.load(input_path, sr=sample_rate, mono=True)
-        progress.update()
-
-        # Estimate noise profile and perform stationary noise reduction
-        noise_sample = audio[:sr] if audio.size > sr else audio
-        reduced = nr.reduce_noise(
-            y=audio,
-            sr=sr,
-            prop_decrease=1.0,
-            stationary=True,
-            n_std_thresh_stationary=1.3,
-            y_noise=noise_sample if noise_sample.size > 0 else None,
-        )
-        progress.update()
-
-        # Restore loudness lost during noise reduction and add a controlled boost
-        eps = 1e-8
-        original_rms = float(np.sqrt(np.mean(audio**2)) + eps)
-        reduced_rms = float(np.sqrt(np.mean(reduced**2)) + eps)
-        target_rms = original_rms * 1.3
-        gain_factor = min(target_rms / reduced_rms, 5.0)
-        boosted = np.clip(reduced * gain_factor, -1.0, 1.0)
-
-        # Normalize and balance dynamics using pydub
-        buffer = BytesIO()
-        sf.write(buffer, boosted, sr, format="WAV")
-        buffer.seek(0)
-        normalized_audio = effects.normalize(AudioSegment.from_file(buffer, format="wav"))
-        balanced_audio = effects.compress_dynamic_range(
-            normalized_audio,
-            threshold=-30.0,
-            ratio=6.0,
-            attack=5,
-            release=50,
-        )
-        progress.update()
-
-        # Trim leading and trailing silence based on the threshold
-        leading = silence.detect_leading_silence(balanced_audio, silence_threshold=silence_threshold)
-        trailing = silence.detect_leading_silence(
-            balanced_audio.reverse(), silence_threshold=silence_threshold
-        )
-        trimmed = balanced_audio[leading:] if trailing == 0 else balanced_audio[leading:-trailing]
-        progress.update()
-
-        # Apply a final gain toward a consistent target loudness without clipping
-        target_dbfs = -9.0
-        max_gain_db = 12.0
-        current_dbfs = trimmed.dBFS if trimmed.dBFS != float("-inf") else -60.0
-        gain_needed = min(target_dbfs - current_dbfs, max_gain_db)
-        loud_output = trimmed.apply_gain(gain_needed)
-
-        # Export the cleaned audio to the requested output path
-        loud_output.export(output_path, format="wav")
-        progress.update()
+    preprocess_pipeline(
+        src_path=input_path,
+        out_path=output_path,
+        target_sr=sample_rate,
+        target_peak_dbfs=target_peak_dbfs,
+        target_lufs=target_lufs,
+        use_deepfilter=use_deepfilter,
+    )
 
     return float(f"{time.time() - start_time:.2f}")
 
 
 def read_or_create_preprocessed_audio(
-    source_path: str | Path,
-    cache_dir: str | Path,
+    source_path: PathLike,
+    cache_dir: PathLike,
     sample_rate: int = 16000,
     silence_threshold: int = -40,
 ) -> Path:

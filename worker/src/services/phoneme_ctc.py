@@ -3,6 +3,7 @@
 使用 wav2vec2 進行音素級別的語音辨識
 """
 
+from typing import Optional
 import torch
 import torchaudio
 from torch.nn import functional as F
@@ -43,7 +44,7 @@ class PhoneCTC:
     def __init__(
         self,
         model_name: str = "facebook/wav2vec2-lv-60-espeak-cv-ft",
-        device: torch.device | None = None,
+        device: Optional[torch.device] = None,
     ) -> None:
         """
         初始化音素 CTC 模型

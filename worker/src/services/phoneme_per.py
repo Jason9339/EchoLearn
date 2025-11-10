@@ -4,6 +4,7 @@ PER (Phoneme Error Rate) 相似度計算
 """
 
 from pathlib import Path
+from typing import Optional, Union
 
 import torchaudio
 
@@ -51,9 +52,9 @@ def _calc_per(ref: list[str], hyp: list[str]) -> float:
 
 
 def calculate_per_similarity(
-    audio_a_path: str | Path,
-    audio_b_path: str | Path,
-    ctc: PhoneCTC | None = None,
+    audio_a_path: Union[str, Path],
+    audio_b_path: Union[str, Path],
+    ctc: Optional[PhoneCTC] = None,
 ) -> float:
     """
     計算兩段語音的 PER 相似度

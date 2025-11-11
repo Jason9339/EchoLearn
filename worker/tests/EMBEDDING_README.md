@@ -1,5 +1,27 @@
 # 語音相似度評估模組
 
+## 🎯 重要：兩種 Embedding 類型
+
+本專案提供**兩種**語音相似度評估模組：
+
+### 1️⃣ Speaker Embedding (本文件)
+- **關注**: 👤 **誰在說話**（聲音特徵、聲紋）
+- **檔案**: `eval_embedding_voice_similarity.py`
+- **用途**: 說話者識別、聲紋認證、說話者分離
+
+### 2️⃣ Content Embedding 
+- **關注**: 💬 **說了什麼**（語義內容、音素）
+- **檔案**: `eval_content_embedding_similarity.py`
+- **用途**: 語音辨識、內容搜索、重複內容檢測
+- **文檔**: 請參考 `README_CONTENT_SIMILARITY.md`
+
+> 💡 **快速選擇**:
+> - 要判斷「是否為同一個人」→ 使用 **Speaker Embedding**（本模組）
+> - 要判斷「是否說了相同內容」→ 使用 **Content Embedding**
+> - 詳細對照請參考 `EMBEDDING_OVERVIEW.md`
+
+---
+
 ## 白話大綱
 - 先安裝環境。
 - 去 `example_test_eval_embedding_voice_similarity.py` 改音檔位置。

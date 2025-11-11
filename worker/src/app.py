@@ -3,7 +3,6 @@ from flask import Flask
 from flask_cors import CORS
 
 # 1. 從您的 routes 檔案 import 那個 blueprint
-from routes.example import example_worker_bp
 from routes.audio import audio_bp
 
 # 2. 建立 App
@@ -18,7 +17,6 @@ CORS(app, origins=cors_origins)
 # 但如果您想更嚴謹，可以保留 resources={r"/worker/*": {}}
 
 
-app.register_blueprint(example_worker_bp, url_prefix='/worker')
 app.register_blueprint(audio_bp, url_prefix='/worker/audio')
 
 # 5. 啟動器

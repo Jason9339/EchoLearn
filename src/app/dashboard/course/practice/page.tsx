@@ -728,15 +728,15 @@ function PracticePageContent() {
       // Simulate AI scoring with a delay (replace with actual API call later)
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Generate a random score between 60-95 for demo
-      const mockScore = Math.floor(Math.random() * 36) + 60;
+      // Generate a random score between 0-5 for demo
+      const mockScore = Math.floor(Math.random() * 6); // 0, 1, 2, 3, 4, or 5
 
       updateRecordingState(sentenceId, slotIndex, {
         isScoring: false,
         score: mockScore,
       });
 
-      console.log(`[AI Scoring] Sentence ${sentenceId}, Slot ${slotIndex}: ${mockScore}/100`);
+      console.log(`[AI Scoring] Sentence ${sentenceId}, Slot ${slotIndex}: ${mockScore}/5`);
     } catch (error) {
       console.error('AI scoring failed:', error);
       updateRecordingState(sentenceId, slotIndex, {
@@ -1149,12 +1149,12 @@ function PracticePageContent() {
                                   {recordingState.score}
                                 </div>
                                 <div className="text-2xl text-gray-400">/</div>
-                                <div className="text-3xl font-semibold text-gray-600">100</div>
+                                <div className="text-3xl font-semibold text-gray-600">5</div>
                               </div>
                               <p className="text-xs text-gray-500 mt-3">
-                                {recordingState.score >= 90 ? '🌟 優秀！' :
-                                 recordingState.score >= 75 ? '👍 良好！' :
-                                 recordingState.score >= 60 ? '💪 不錯，繼續加油！' :
+                                {recordingState.score >= 4 ? '🌟 優秀！' :
+                                 recordingState.score >= 3 ? '👍 良好！' :
+                                 recordingState.score >= 2 ? '💪 不錯，繼續加油！' :
                                  '📚 多練習會更好！'}
                               </p>
                             </div>

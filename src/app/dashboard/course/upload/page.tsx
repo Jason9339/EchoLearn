@@ -128,7 +128,8 @@ export default function UploadAudioPage() {
   const trimAudioFile = async (file: File, maxDuration: number): Promise<File> => {
     // Use Web Audio API to trim the audio
     const arrayBuffer = await file.arrayBuffer();
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const audioContext = new AudioContextClass();
 
     try {
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);

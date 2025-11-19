@@ -98,7 +98,7 @@ export async function POST(request: Request): Promise<Response> {
 /**
  * GET /api/ratings
  * Get all ratings for the current user's recordings
- * Query params: sentenceId (optional), slotIndex (optional)
+ * Query params: courseId (optional), sentenceId (optional), slotIndex (optional)
  * Returns JSON: { success, ratings: [{ id, recordingId, sentenceId, slotIndex, score, createdAt }] }
  */
 export async function GET(request: Request): Promise<Response> {
@@ -131,6 +131,7 @@ export async function GET(request: Request): Promise<Response> {
     const { searchParams } = new URL(request.url);
     const sentenceId = searchParams.get('sentenceId');
     const slotIndex = searchParams.get('slotIndex');
+    const courseId = searchParams.get('courseId');
 
     // Build query based on filters
     let ratings;
@@ -139,6 +140,43 @@ export async function GET(request: Request): Promise<Response> {
       const sentenceIdNum = Number.parseInt(sentenceId, 10);
       const slotIndexNum = Number.parseInt(slotIndex, 10);
 
+      if (courseId !== null) {
+        // Filter by course, sentence and slot
+        ratings = await sql`
+          SELECT
+            r.id,
+            r.recording_id as "recordingId",
+            r.sentence_id as "sentenceId",
+            r.slot_index as "slotIndex",
+            r.score,
+            r.created_at as "createdAt"
+          FROM ratings r
+          INNER JOIN recordings rec ON r.recording_id = rec.id
+          WHERE rec.user_id::text = ${normalizedUserId}
+            AND r.rater_user_id::text = ${normalizedUserId}
+            AND rec.course_id = ${courseId}
+            AND r.sentence_id = ${sentenceIdNum}
+            AND r.slot_index = ${slotIndexNum}
+        `;
+      } else {
+        ratings = await sql`
+          SELECT
+            r.id,
+            r.recording_id as "recordingId",
+            r.sentence_id as "sentenceId",
+            r.slot_index as "slotIndex",
+            r.score,
+            r.created_at as "createdAt"
+          FROM ratings r
+          INNER JOIN recordings rec ON r.recording_id = rec.id
+          WHERE rec.user_id::text = ${normalizedUserId}
+            AND r.rater_user_id::text = ${normalizedUserId}
+            AND r.sentence_id = ${sentenceIdNum}
+            AND r.slot_index = ${slotIndexNum}
+        `;
+      }
+    } else if (courseId !== null) {
+      // Filter by course only
       ratings = await sql`
         SELECT
           r.id,
@@ -151,8 +189,8 @@ export async function GET(request: Request): Promise<Response> {
         INNER JOIN recordings rec ON r.recording_id = rec.id
         WHERE rec.user_id::text = ${normalizedUserId}
           AND r.rater_user_id::text = ${normalizedUserId}
-          AND r.sentence_id = ${sentenceIdNum}
-          AND r.slot_index = ${slotIndexNum}
+          AND rec.course_id = ${courseId}
+        ORDER BY r.sentence_id, r.slot_index
       `;
     } else {
       // Get all ratings for user's recordings

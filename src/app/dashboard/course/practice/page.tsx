@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 
-import { Suspense, useState, useCallback, useRef, useEffect } from 'react';
+import { Suspense, useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { PlayIcon, ArrowUturnLeftIcon } from '@heroicons/react/24/outline';
 import { useSession } from 'next-auth/react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 
 import { courses, defaultPracticeCourseId, practiceSentences } from '@/app/lib/placeholder-data';
 import type { PracticeSentence } from '@/app/lib/definitions';
@@ -15,6 +15,8 @@ import RecordingButton from '@/components/RecordingButton';
 import RatingBar from '@/components/RatingBar';
 
 const fallbackCourseTitle = '口說練習';
+const DEFAULT_SENTENCES_PER_PAGE = 10;
+const SENTENCES_PER_PAGE_OPTIONS = [6, 10, 15, 20];
 
 // Type for managing recording states for each sentence and slot
 type SentenceRecordingStates = {
@@ -41,6 +43,8 @@ export default function PracticePage() {
 function PracticePageContent() {
   const { status: sessionStatus } = useSession();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const selectedCourseId = searchParams.get('courseId') ?? defaultPracticeCourseId;
   const isCustomCourse = searchParams.get('custom') === 'true';
   const courseId = practiceSentences[selectedCourseId] ? selectedCourseId : defaultPracticeCourseId;
@@ -56,12 +60,48 @@ function PracticePageContent() {
   const mediaRecordersRef = useRef<Record<string, MediaRecorder>>({});
   const cleanupFunctionsRef = useRef<Record<string, () => void>>({});
 
-  const currentCourse = isCustomCourse ? customCourseData : courses.find((course) => course.id === courseId);
-  const sentences: PracticeSentence[] = isCustomCourse ? customSentences : (practiceSentences[courseId] ?? []);
+    // 用來避免多個音檔同時播放
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // 課程資訊：custom 課程用 customCourseData，其他用預設 courses
+  const currentCourse = isCustomCourse
+    ? customCourseData
+    : courses.find((course) => course.id === courseId);
+
+  // 句子來源：custom 課程用 customSentences，其它用 practiceSentences
+  const sentences: PracticeSentence[] = useMemo(
+    () => (isCustomCourse ? customSentences : (practiceSentences[courseId] ?? [])),
+    [isCustomCourse, customSentences, courseId],
+  );
+
+  const totalSentences = sentences.length;
+
+  const rawPerPageParam = searchParams.get('perPage');
+  const parsedPerPage = rawPerPageParam ? parseInt(rawPerPageParam, 10) : NaN;
+  const sentencesPerPage = SENTENCES_PER_PAGE_OPTIONS.includes(parsedPerPage)
+    ? parsedPerPage
+    : DEFAULT_SENTENCES_PER_PAGE;
+
+  const totalPages = Math.max(1, Math.ceil(totalSentences / sentencesPerPage) || 1);
+
+  const rawPageParam = parseInt(searchParams.get('page') ?? '1', 10);
+  const normalizedPage = Number.isNaN(rawPageParam) ? 1 : rawPageParam;
+  const currentPage = Math.min(Math.max(normalizedPage, 1), totalPages);
+
+  const pageStartIndex = (currentPage - 1) * sentencesPerPage;
+  const showingFrom = totalSentences === 0 ? 0 : pageStartIndex + 1;
+  const showingTo =
+    totalSentences === 0 ? 0 : Math.min(pageStartIndex + sentencesPerPage, totalSentences);
+
+  const paginatedSentences = useMemo(
+    () => sentences.slice(pageStartIndex, pageStartIndex + sentencesPerPage),
+    [sentences, pageStartIndex, sentencesPerPage],
+  );
+
   const maxRecordingSeconds = Math.floor(MAX_RECORDING_DURATION_MS / 1000);
   const defaultCourseDescription = `逐句練習：點擊播放聽一次，再點錄音模仿。每個句子可以錄製 3 次，每次最多 ${maxRecordingSeconds} 秒。`;
 
-  // Fetch custom course data if needed
+  // custom 課程：去打 /api/courses/:id/details + /status
   useEffect(() => {
     if (isCustomCourse && selectedCourseId) {
       fetchCustomCourseData();
@@ -71,11 +111,10 @@ function PracticePageContent() {
   const fetchCustomCourseData = async () => {
     try {
       setLoading(true);
-      
-      // Fetch course details and status in parallel
+
       const [detailsResponse, statusResponse] = await Promise.all([
         fetch(`/api/courses/${selectedCourseId}/details`),
-        fetch(`/api/courses/${selectedCourseId}/status`)
+        fetch(`/api/courses/${selectedCourseId}/status`),
       ]);
 
       if (detailsResponse.ok && statusResponse.ok) {
@@ -83,26 +122,31 @@ function PracticePageContent() {
         const statusData = await statusResponse.json();
 
         if (detailsData.success && statusData.success && statusData.status === 'completed') {
-          // Set course data with real title and description
           setCustomCourseData({
             id: selectedCourseId,
             title: detailsData.course.title,
-            description: detailsData.course.description || `您的自訂影子跟讀課程，包含 ${statusData.sentences?.length || 0} 個句子。`,
+            description:
+              detailsData.course.description ||
+              `您的自訂影子跟讀課程，包含 ${statusData.sentences?.length || 0} 個句子。`,
           });
 
-          // Convert course sentences to practice sentences format
-          interface CourseSentenceApi { sentenceId: number; text: string; audioUrl?: string }
-          const practiceFormat: PracticeSentence[] = (statusData.sentences as CourseSentenceApi[] | undefined)?.map((sentence) => ({
-            id: sentence.sentenceId,
-            text: sentence.text,
-            translation: '', // Custom courses don't have translations
-            audioSrc: sentence.audioUrl || '', // Use the generated audio URL or empty string
-          })) || [];
+          interface CourseSentenceApi {
+            sentenceId: number;
+            text: string;
+            audioUrl?: string;
+          }
+
+          const practiceFormat: PracticeSentence[] =
+            (statusData.sentences as CourseSentenceApi[] | undefined)?.map((sentence) => ({
+              id: sentence.sentenceId,
+              text: sentence.text,
+              translation: '',
+              audioSrc: sentence.audioUrl || '',
+            })) || [];
 
           setCustomSentences(practiceFormat);
         } else {
           console.error('Custom course not ready or not found');
-          // Redirect back to course list if course is not ready
           window.location.href = '/dashboard/course';
         }
       } else {
@@ -117,6 +161,71 @@ function PracticePageContent() {
     }
   };
 
+  // 分頁參數寫回網址 ?page=&perPage=
+  const updateQueryParams = useCallback((updates: { page?: number; perPage?: number }) => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (updates.page !== undefined) {
+      if (updates.page <= 1) {
+        params.delete('page');
+      } else {
+        params.set('page', updates.page.toString());
+      }
+    }
+
+    if (updates.perPage !== undefined) {
+      if (updates.perPage === DEFAULT_SENTENCES_PER_PAGE) {
+        params.delete('perPage');
+      } else {
+        params.set('perPage', updates.perPage.toString());
+      }
+    }
+
+    const queryString = params.toString();
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
+  }, [pathname, router, searchParams]);
+
+  // 保持網址上的 page/perPage 跟現在 state 同步
+  useEffect(() => {
+    const updates: { page?: number; perPage?: number } = {};
+
+    const pageParamInUrl = searchParams.get('page');
+    const desiredPageParam = currentPage === 1 ? null : currentPage.toString();
+    if (pageParamInUrl !== desiredPageParam) {
+      updates.page = currentPage;
+    }
+
+    const perPageParamInUrl = searchParams.get('perPage');
+    const desiredPerPageParam =
+      sentencesPerPage === DEFAULT_SENTENCES_PER_PAGE ? null : sentencesPerPage.toString();
+    if (perPageParamInUrl !== desiredPerPageParam) {
+      updates.perPage = sentencesPerPage;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      updateQueryParams(updates);
+    }
+  }, [currentPage, sentencesPerPage, searchParams, updateQueryParams]);
+
+  const handlePageChange = useCallback(
+    (nextPage: number) => {
+      const clampedPage = Math.min(Math.max(nextPage, 1), totalPages);
+      updateQueryParams({ page: clampedPage });
+    },
+    [totalPages, updateQueryParams],
+  );
+
+  const handlePageSizeChange = useCallback(
+    (nextSize: number) => {
+      const safeSize = SENTENCES_PER_PAGE_OPTIONS.includes(nextSize)
+        ? nextSize
+        : DEFAULT_SENTENCES_PER_PAGE;
+      updateQueryParams({ perPage: safeSize, page: 1 });
+    },
+    [updateQueryParams],
+  );
+
+
   useEffect(() => {
     Object.values(mediaRecordersRef.current).forEach(recorder => {
       if (recorder.state === 'recording') {
@@ -124,6 +233,14 @@ function PracticePageContent() {
       }
     });
     Object.values(cleanupFunctionsRef.current).forEach(cleanup => cleanup());
+
+    // Stop any currently playing audio when switching courses
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.currentTime = 0;
+      currentAudioRef.current = null;
+    }
+
     mediaRecordersRef.current = {};
     cleanupFunctionsRef.current = {};
     setRecordingStates({});
@@ -228,7 +345,7 @@ function PracticePageContent() {
 
     const loadRatings = async () => {
       try {
-        const response = await fetch('/api/ratings', {
+        const response = await fetch(`/api/ratings?courseId=${encodeURIComponent(courseId)}`, {
           credentials: 'include',
           signal: controller.signal,
         });
@@ -288,12 +405,18 @@ function PracticePageContent() {
           recorder.stop();
         }
       });
-      
+
       // Call all cleanup functions
       Object.values(cleanupFunctionsRef.current).forEach(cleanup => {
         cleanup();
       });
-      
+
+      // Stop any currently playing audio
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
+
       // Clear refs
       mediaRecordersRef.current = {};
       cleanupFunctionsRef.current = {};
@@ -309,14 +432,39 @@ function PracticePageContent() {
   const handlePlay = (sentence: PracticeSentence) => {
     if (typeof window === 'undefined') return;
 
+    // Stop any currently playing audio to prevent overlapping
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.currentTime = 0;
+      currentAudioRef.current = null;
+    }
+
     // Immediately mark sentence as played when user clicks play button
     setPlayedSentences(prev => new Set(prev).add(sentence.id));
 
     // Play the actual audio file
     if (sentence.audioSrc) {
       const audio = new Audio(sentence.audioSrc);
+      currentAudioRef.current = audio;
+
+      // Clear ref when audio finishes or encounters an error
+      audio.onended = () => {
+        if (currentAudioRef.current === audio) {
+          currentAudioRef.current = null;
+        }
+      };
+
+      audio.onerror = () => {
+        if (currentAudioRef.current === audio) {
+          currentAudioRef.current = null;
+        }
+      };
+
       audio.play().catch(error => {
         console.error('Failed to play audio:', error);
+        if (currentAudioRef.current === audio) {
+          currentAudioRef.current = null;
+        }
       });
     }
   };
@@ -549,10 +697,35 @@ function PracticePageContent() {
     const recordingState = getRecordingState(sentenceId, slotIndex);
     if (!recordingState.audioUrl) return;
 
+    // Stop any currently playing audio to prevent overlapping
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.currentTime = 0;
+      currentAudioRef.current = null;
+    }
+
     const audio = new Audio(recordingState.audioUrl);
+    currentAudioRef.current = audio;
+
+    // Clear ref when audio finishes or encounters an error
+    audio.onended = () => {
+      if (currentAudioRef.current === audio) {
+        currentAudioRef.current = null;
+      }
+    };
+
+    audio.onerror = () => {
+      if (currentAudioRef.current === audio) {
+        currentAudioRef.current = null;
+      }
+    };
+
     audio.play().catch(error => {
       console.error('Failed to play audio:', error);
       updateRecordingState(sentenceId, slotIndex, { error: 'PLAYBACK_ERROR' });
+      if (currentAudioRef.current === audio) {
+        currentAudioRef.current = null;
+      }
     });
   }, [getRecordingState, updateRecordingState]);
 
@@ -811,17 +984,35 @@ function PracticePageContent() {
       </div>
 
       <section className="space-y-6">
-        {sentences.map((sentence) => {
-          const hasAnyRecording = [0, 1, 2].some(slotIndex => {
-            const state = getRecordingState(sentence.id, slotIndex);
-            return Boolean(state.audioBlob || state.audioUrl);
-          });
+        <SentencePaginationControls
+          idSuffix="top"
+          currentPage={currentPage}
+          totalPages={totalPages}
+          perPage={sentencesPerPage}
+          perPageOptions={SENTENCES_PER_PAGE_OPTIONS}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+          showingFrom={showingFrom}
+          showingTo={showingTo}
+          totalItems={totalSentences}
+        />
 
-          return (
-            <article
-              key={sentence.id}
-              className="rounded-xl border bg-white p-6 shadow-sm transition hover:border-[#476EAE]/30"
-            >
+        {paginatedSentences.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray-200 bg-white/70 p-8 text-center text-sm text-gray-500">
+            目前沒有可顯示的練習句子。
+          </div>
+        ) : (
+          paginatedSentences.map((sentence) => {
+            const hasAnyRecording = [0, 1, 2].some(slotIndex => {
+              const state = getRecordingState(sentence.id, slotIndex);
+              return Boolean(state.audioBlob || state.audioUrl);
+            });
+
+            return (
+              <article
+                key={sentence.id}
+                className="rounded-xl border bg-white p-6 shadow-sm transition hover:border-[#476EAE]/30"
+              >
               {/* Sentence Content */}
               <div className="mb-6">
                 <div className="flex items-center justify-between gap-4">
@@ -992,10 +1183,120 @@ function PracticePageContent() {
                   </div>
                 </div>
               </div>
-            </article>
-          );
-        })}
+              </article>
+            );
+          })
+        )}
+
+        {totalPages > 1 && paginatedSentences.length > 0 && (
+          <SentencePaginationControls
+            idSuffix="bottom"
+            currentPage={currentPage}
+            totalPages={totalPages}
+            perPage={sentencesPerPage}
+            perPageOptions={SENTENCES_PER_PAGE_OPTIONS}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            showingFrom={showingFrom}
+            showingTo={showingTo}
+            totalItems={totalSentences}
+            className="mt-2"
+          />
+        )}
       </section>
+    </div>
+  );
+}
+
+type SentencePaginationControlsProps = {
+  idSuffix: string;
+  currentPage: number;
+  totalPages: number;
+  perPage: number;
+  perPageOptions: number[];
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+  showingFrom: number;
+  showingTo: number;
+  totalItems: number;
+  className?: string;
+};
+
+function SentencePaginationControls({
+  idSuffix,
+  currentPage,
+  totalPages,
+  perPage,
+  perPageOptions,
+  onPageChange,
+  onPageSizeChange,
+  showingFrom,
+  showingTo,
+  totalItems,
+  className = '',
+}: SentencePaginationControlsProps) {
+  const selectId = `sentences-per-page-${idSuffix}`;
+  const disablePrev = currentPage <= 1 || totalItems === 0;
+  const disableNext = currentPage >= totalPages || totalItems === 0;
+
+  return (
+    <div
+      className={`flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-100 bg-white/80 px-4 py-3 text-sm shadow-sm ${className}`}
+    >
+      <div>
+        <p className="text-xs text-gray-500">目前顯示</p>
+        <p className="text-sm font-semibold text-gray-900">
+          {totalItems === 0 ? '尚無句子' : `${showingFrom} - ${showingTo} / ${totalItems} 句`}
+        </p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <label htmlFor={selectId} className="text-sm text-gray-600">
+          每頁顯示
+        </label>
+        <select
+          id={selectId}
+          value={perPage}
+          onChange={(event) => onPageSizeChange(Number(event.target.value))}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-[#476EAE] focus:outline-none focus:ring-2 focus:ring-[#476EAE]/20"
+        >
+          {perPageOptions.map((option) => (
+            <option key={option} value={option}>
+              {option} 句
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={disablePrev}
+          className={`rounded-lg border px-3 py-1.5 font-medium transition ${
+            disablePrev
+              ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
+              : 'border-[#476EAE]/40 bg-white text-[#476EAE] hover:bg-[#476EAE]/10'
+          }`}
+        >
+          上一頁
+        </button>
+        <span className="text-sm text-gray-600">
+          第 {totalItems === 0 ? 0 : currentPage} / {totalPages} 頁
+        </span>
+        <button
+          type="button"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={disableNext}
+          className={`rounded-lg border px-3 py-1.5 font-medium transition ${
+            disableNext
+              ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
+              : 'border-[#476EAE]/40 bg-white text-[#476EAE] hover:bg-[#476EAE]/10'
+          }`}
+        >
+          下一頁
+        </button>
+      </div>
     </div>
   );
 }

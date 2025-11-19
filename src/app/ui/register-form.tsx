@@ -1,25 +1,39 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { ArrowRightIcon } from '@heroicons/react/20/solid';
 import {
   ExclamationCircleIcon,
   AtSymbolIcon,
   KeyIcon,
   UserIcon,
+  InformationCircleIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '@/app/ui/button';
 import { registerAction } from '@/app/lib/actions';
+import RegisterTutorialModal from '@/app/ui/register-tutorial-modal';
 
 export default function RegisterForm() {
   const [errorMessage, formAction, isPending] = useActionState(
     registerAction,
     undefined,
   );
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
 
   return (
-    <form action={formAction} className="space-y-3">
-      <div className="flex-1 rounded-lg bg-gray-50 px-6 pb-4 pt-8">
+    <>
+      <form action={formAction} className="space-y-3">
+        <div className="flex-1 rounded-lg bg-gray-50 px-6 pb-4 pt-8 relative">
+          {/* Info Icon - 右下角 */}
+          <button
+            type="button"
+            onClick={() => setIsTutorialOpen(true)}
+            className="absolute bottom-4 right-4 text-gray-400 hover:text-blue-600 transition-colors"
+            aria-label="查看註冊教學"
+          >
+            <InformationCircleIcon className="h-6 w-6" />
+          </button>
+
         <h1 className="mb-3 text-2xl">Create your account</h1>
         <div className="w-full">
           <label
@@ -104,5 +118,12 @@ export default function RegisterForm() {
         </p>
       </div>
     </form>
+
+    {/* 註冊教學彈窗 */}
+    <RegisterTutorialModal 
+      isOpen={isTutorialOpen} 
+      onClose={() => setIsTutorialOpen(false)} 
+    />
+    </>
   );
 }

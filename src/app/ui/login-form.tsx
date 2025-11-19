@@ -4,12 +4,14 @@ import {
   AtSymbolIcon,
   KeyIcon,
   ExclamationCircleIcon,
+  InformationCircleIcon,
 } from '@heroicons/react/24/outline';
 import { ArrowRightIcon } from '@heroicons/react/20/solid';
 import { Button } from '@/app/ui/button';
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { authenticate } from '@/app/lib/actions';
 import { useSearchParams } from 'next/navigation';
+import LoginTutorialModal from '@/app/ui/login-tutorial-modal';
  
 export default function LoginForm() {
   const searchParams = useSearchParams();
@@ -18,11 +20,23 @@ export default function LoginForm() {
     authenticate,
     undefined,
   );
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
  
   return (
-    <form action={formAction} className="space-y-3">
-      <div className="flex-1 rounded-lg bg-gray-50 px-6 pb-4 pt-8">
-        <h1 className="mb-3 text-2xl">Please log in to continue.</h1>
+    <>
+      <form action={formAction} className="space-y-3">
+        <div className="flex-1 rounded-lg bg-gray-50 px-6 pb-4 pt-8 relative">
+          {/* Info Icon - 右下角 */}
+          <button
+            type="button"
+            onClick={() => setIsTutorialOpen(true)}
+            className="absolute bottom-4 right-4 text-gray-400 hover:text-blue-600 transition-colors"
+            aria-label="查看登入教學"
+          >
+            <InformationCircleIcon className="h-6 w-6" />
+          </button>
+
+          <h1 className="mb-3 text-2xl">Please log in to continue.</h1>
         <div className="w-full">
           <div>
             <label
@@ -89,5 +103,12 @@ export default function LoginForm() {
         </p>
       </div>
     </form>
+
+    {/* 登入教學彈窗 */}
+    <LoginTutorialModal 
+      isOpen={isTutorialOpen} 
+      onClose={() => setIsTutorialOpen(false)} 
+    />
+    </>
   );
 }

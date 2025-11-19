@@ -1,0 +1,32 @@
+# Flask Web Server (原有)
+blinker==1.9.0
+click==8.3.0
+Flask==3.1.2
+flask-cors==6.0.1
+itsdangerous==2.2.0
+Jinja2==3.1.6
+MarkupSafe==3.0.3
+Werkzeug==3.1.3
+
+# PyTorch (請先手動安裝對應版本)
+# GPU: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
+# CPU: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+torch>=2.0.0
+torchaudio>=2.0.0
+
+# 音素相似度計算 - 核心依賴
+transformers>=4.30.0
+librosa>=0.10.0
+soundfile>=0.12.0
+numpy>=1.24.0
+pyloudnorm>=0.1.0
+phonemizer>=3.0.0  # 音素標記處理 (需配合 espeak-ng 系統套件)
+
+# 音素相似度計算 - 原有依賴
+whisper>=1.0.0
+noisereduce>=2.0.0
+pydub>=0.25.0
+tqdm>=4.65.0
+
+# 可選: 降噪功能 (取消註解以安裝)
+# deepfilternet>=0.5.0

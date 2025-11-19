@@ -22,6 +22,10 @@ export interface RecordingState {
   fileSize: number | null;
   /** Server recording ID if persisted */
   recordingId: string | null;
+  /** Whether AI scoring is in progress */
+  isScoring?: boolean;
+  /** AI score result (0-100) */
+  score?: number | null;
 }
 
 export interface UseAudioRecorderReturn {

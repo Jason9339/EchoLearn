@@ -75,6 +75,7 @@ export async function DELETE(
     const filesToDelete: string[] = [];
 
     // 1. Original audio file (from course-uploads)
+    let tempUploadFolder: string | null = null;
     if (course.originalAudioUrl) {
       try {
         const url = new URL(course.originalAudioUrl);
@@ -84,6 +85,14 @@ export async function DELETE(
           const storagePath = pathParts.slice(bucketIndex + 1).join('/');
           filesToDelete.push(storagePath);
           console.log(`[courses/delete] Will delete original audio: ${storagePath}`);
+
+          // Extract temp folder path (e.g., course-uploads/{tempId})
+          // Path format: course-uploads/{tempId}/{filename}
+          const pathSegments = storagePath.split('/');
+          if (pathSegments[0] === 'course-uploads' && pathSegments.length >= 2) {
+            tempUploadFolder = `${pathSegments[0]}/${pathSegments[1]}`;
+            console.log(`[courses/delete] Will delete temp upload folder: ${tempUploadFolder}`);
+          }
         }
       } catch (urlError) {
         console.warn('[courses/delete] Could not parse original audio URL:', course.originalAudioUrl);
@@ -188,22 +197,96 @@ export async function DELETE(
     let deletedFiles = 0;
     let failedFiles = 0;
 
-    for (const filePath of filesToDelete) {
+    // Try batch delete first (more efficient)
+    if (filesToDelete.length > 0) {
       try {
-        const { error } = await supabase.storage
+        const { data: batchDeleteData, error: batchError } = await supabase.storage
           .from('recordings')
-          .remove([filePath]);
+          .remove(filesToDelete);
 
-        if (error) {
-          console.warn(`[courses/delete] Failed to delete storage file ${filePath}:`, error.message);
-          failedFiles++;
+        if (batchError) {
+          console.warn(`[courses/delete] Batch delete failed, falling back to individual deletes:`, batchError.message);
+
+          // Fall back to individual deletes
+          for (const filePath of filesToDelete) {
+            try {
+              const { error } = await supabase.storage
+                .from('recordings')
+                .remove([filePath]);
+
+              if (error) {
+                console.warn(`[courses/delete] Failed to delete storage file ${filePath}:`, error.message);
+                failedFiles++;
+              } else {
+                console.log(`[courses/delete] Successfully deleted storage file: ${filePath}`);
+                deletedFiles++;
+              }
+            } catch (storageError) {
+              console.warn(`[courses/delete] Error deleting storage file ${filePath}:`, storageError);
+              failedFiles++;
+            }
+          }
         } else {
-          console.log(`[courses/delete] Successfully deleted storage file: ${filePath}`);
-          deletedFiles++;
+          // Batch delete succeeded
+          deletedFiles = filesToDelete.length;
+          console.log(`[courses/delete] Batch deleted ${deletedFiles} storage files`);
         }
-      } catch (storageError) {
-        console.warn(`[courses/delete] Error deleting storage file ${filePath}:`, storageError);
-        failedFiles++;
+      } catch (batchError) {
+        console.warn(`[courses/delete] Batch delete exception, falling back to individual deletes:`, batchError);
+
+        // Fall back to individual deletes
+        for (const filePath of filesToDelete) {
+          try {
+            const { error } = await supabase.storage
+              .from('recordings')
+              .remove([filePath]);
+
+            if (error) {
+              console.warn(`[courses/delete] Failed to delete storage file ${filePath}:`, error.message);
+              failedFiles++;
+            } else {
+              console.log(`[courses/delete] Successfully deleted storage file: ${filePath}`);
+              deletedFiles++;
+            }
+          } catch (storageError) {
+            console.warn(`[courses/delete] Error deleting storage file ${filePath}:`, storageError);
+            failedFiles++;
+          }
+        }
+      }
+    }
+
+    // Delete temp upload folder if it exists
+    if (tempUploadFolder) {
+      try {
+        console.log(`[courses/delete] Attempting to delete temp folder: ${tempUploadFolder}`);
+
+        // List all files in the temp folder
+        const { data: folderFiles, error: listError } = await supabase.storage
+          .from('recordings')
+          .list(tempUploadFolder);
+
+        if (listError) {
+          console.warn(`[courses/delete] Could not list temp folder contents:`, listError.message);
+        } else if (folderFiles && folderFiles.length > 0) {
+          // Delete remaining files in the folder
+          const remainingFiles = folderFiles.map(file => `${tempUploadFolder}/${file.name}`);
+          console.log(`[courses/delete] Deleting ${remainingFiles.length} remaining files in temp folder`);
+
+          const { error: folderDeleteError } = await supabase.storage
+            .from('recordings')
+            .remove(remainingFiles);
+
+          if (folderDeleteError) {
+            console.warn(`[courses/delete] Failed to delete temp folder contents:`, folderDeleteError.message);
+          } else {
+            console.log(`[courses/delete] Successfully deleted temp folder: ${tempUploadFolder}`);
+          }
+        } else {
+          console.log(`[courses/delete] Temp folder already empty or doesn't exist`);
+        }
+      } catch (folderError) {
+        console.warn(`[courses/delete] Error deleting temp folder:`, folderError);
       }
     }
 

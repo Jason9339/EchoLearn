@@ -32,12 +32,14 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     // Validate file properties (increased size limit for course audio)
-    const maxSizeBytes = 50 * 1024 * 1024; // 50MB
+    const maxSizeBytes = 100 * 1024 * 1024; // 100MB
+    // Note: Audio duration is limited to 10 minutes on the frontend
+    // The frontend automatically trims audio files exceeding 10 minutes
     const { isValid, error } = validateAudioFile(file, maxSizeBytes);
     if (!isValid) {
-      return Response.json({ 
-        success: false, 
-        error 
+      return Response.json({
+        success: false,
+        error
       } as UploadAudioResponse, { status: 400 });
     }
 

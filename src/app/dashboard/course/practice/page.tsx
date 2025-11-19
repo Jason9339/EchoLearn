@@ -12,7 +12,6 @@ import type { PracticeSentence } from '@/app/lib/definitions';
 import type { RecordingState } from '@/types/audio';
 import { MAX_RECORDING_DURATION_MS } from '@/types/audio';
 import RecordingButton from '@/components/RecordingButton';
-import RatingBar from '@/components/RatingBar';
 
 const fallbackCourseTitle = '口說練習';
 const DEFAULT_SENTENCES_PER_PAGE = 10;
@@ -25,12 +24,7 @@ type SentenceRecordingStates = {
   };
 };
 
-// Type for managing ratings for each sentence and slot
-type SentenceRatings = {
-  [sentenceId: number]: {
-    [slotIndex: number]: number | null;
-  };
-};
+// Note: SentenceRatings type removed - ratings functionality disabled for application mode
 
 export default function PracticePage() {
   return (
@@ -50,7 +44,6 @@ function PracticePageContent() {
   const courseId = practiceSentences[selectedCourseId] ? selectedCourseId : defaultPracticeCourseId;
   const [recordingStates, setRecordingStates] = useState<SentenceRecordingStates>({});
   const [playedSentences, setPlayedSentences] = useState<Set<number>>(new Set());
-  const [ratings, setRatings] = useState<SentenceRatings>({});
   interface CustomCourseData { id: string; title: string; description: string }
   const [customCourseData, setCustomCourseData] = useState<CustomCourseData | null>(null);
   const [customSentences, setCustomSentences] = useState<PracticeSentence[]>([]);
@@ -101,25 +94,31 @@ function PracticePageContent() {
   const maxRecordingSeconds = Math.floor(MAX_RECORDING_DURATION_MS / 1000);
   const defaultCourseDescription = `逐句練習：點擊播放聽一次，再點錄音模仿。每個句子可以錄製 3 次，每次最多 ${maxRecordingSeconds} 秒。`;
 
-  // custom 課程：去打 /api/courses/:id/details + /status
-  useEffect(() => {
-    if (isCustomCourse && selectedCourseId) {
-      fetchCustomCourseData();
-    }
-  }, [isCustomCourse, selectedCourseId]);
-
-  const fetchCustomCourseData = async () => {
+  const fetchCustomCourseData = useCallback(async () => {
     try {
       setLoading(true);
+      console.log('[fetchCustomCourseData] Fetching data for course:', selectedCourseId);
 
       const [detailsResponse, statusResponse] = await Promise.all([
         fetch(`/api/courses/${selectedCourseId}/details`),
         fetch(`/api/courses/${selectedCourseId}/status`),
       ]);
 
+      console.log('[fetchCustomCourseData] Response status:', {
+        details: detailsResponse.status,
+        status: statusResponse.status,
+      });
+
       if (detailsResponse.ok && statusResponse.ok) {
         const detailsData = await detailsResponse.json();
         const statusData = await statusResponse.json();
+
+        console.log('[fetchCustomCourseData] Data received:', {
+          detailsSuccess: detailsData.success,
+          statusSuccess: statusData.success,
+          courseStatus: statusData.status,
+          sentencesCount: statusData.sentences?.length,
+        });
 
         if (detailsData.success && statusData.success && statusData.status === 'completed') {
           setCustomCourseData({
@@ -145,21 +144,51 @@ function PracticePageContent() {
             })) || [];
 
           setCustomSentences(practiceFormat);
+          console.log('[fetchCustomCourseData] Course data loaded successfully');
         } else {
-          console.error('Custom course not ready or not found');
-          window.location.href = '/dashboard/course';
+          console.error('[fetchCustomCourseData] Course not ready:', {
+            detailsSuccess: detailsData.success,
+            statusSuccess: statusData.success,
+            status: statusData.status,
+          });
+          // 使用 router 而不是 window.location.href
+          router.push('/dashboard/course');
         }
       } else {
-        console.error('Failed to fetch custom course data');
-        window.location.href = '/dashboard/course';
+        console.error('[fetchCustomCourseData] API request failed:', {
+          detailsStatus: detailsResponse.status,
+          statusStatus: statusResponse.status,
+        });
+
+        // 嘗試讀取錯誤訊息
+        try {
+          const detailsError = await detailsResponse.json();
+          const statusError = await statusResponse.json();
+          console.error('[fetchCustomCourseData] Error details:', { detailsError, statusError });
+        } catch (e) {
+          // 忽略 JSON 解析錯誤
+        }
+
+        router.push('/dashboard/course');
       }
     } catch (error) {
-      console.error('Error fetching custom course data:', error);
-      window.location.href = '/dashboard/course';
+      console.error('[fetchCustomCourseData] Exception:', error);
+      router.push('/dashboard/course');
     } finally {
       setLoading(false);
+      console.log('[fetchCustomCourseData] Loading set to false');
     }
-  };
+  }, [selectedCourseId, router]);
+
+  // custom 課程：去打 /api/courses/:id/details + /status
+  useEffect(() => {
+    if (isCustomCourse && selectedCourseId) {
+      fetchCustomCourseData();
+    } else if (!isCustomCourse) {
+      // 如果不是自訂課程，確保 loading 設為 false
+      setLoading(false);
+    }
+  }, [isCustomCourse, selectedCourseId, fetchCustomCourseData]);
 
   // 分頁參數寫回網址 ?page=&perPage=
   const updateQueryParams = useCallback((updates: { page?: number; perPage?: number }) => {
@@ -245,7 +274,6 @@ function PracticePageContent() {
     cleanupFunctionsRef.current = {};
     setRecordingStates({});
     setPlayedSentences(new Set<number>());
-    setRatings({});
   }, [isCustomCourse ? selectedCourseId : courseId]);
 
   // Initialize recording state for a sentence slot
@@ -343,53 +371,8 @@ function PracticePageContent() {
       }
     };
 
-    const loadRatings = async () => {
-      try {
-        const response = await fetch(`/api/ratings?courseId=${encodeURIComponent(courseId)}`, {
-          credentials: 'include',
-          signal: controller.signal,
-        });
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => 'Unknown error');
-          if (response.status !== 401) {
-            console.error('Failed to load ratings:', response.status, errorText);
-          }
-          return;
-        }
-
-        const data = await response.json();
-        // console.log('Loaded ratings:', data);
-        if (data.success && data.ratings && data.ratings.length > 0) {
-          // Set existing ratings to state
-          const newRatings: SentenceRatings = {};
-          data.ratings.forEach((rating: {
-            id: number;
-            sentenceId: number;
-            slotIndex: number;
-            score: number;
-          }) => {
-            if (!newRatings[rating.sentenceId]) {
-              newRatings[rating.sentenceId] = {};
-            }
-            newRatings[rating.sentenceId][rating.slotIndex] = rating.score;
-            // console.log(`Setting rating for sentence ${rating.sentenceId}, slot ${rating.slotIndex}: ${rating.score}`);
-          });
-          // console.log('Final ratings state:', newRatings);
-          setRatings(newRatings);
-        } else {
-          // console.log('No ratings found or empty response');
-        }
-      } catch (error) {
-        // Ignore AbortError when component unmounts
-        if (error instanceof Error && error.name === 'AbortError') {
-          return;
-        }
-        console.error('Error loading ratings:', error);
-      }
-    };
-
     loadRecordings();
-    loadRatings();
+    // Note: Ratings functionality removed for application mode
 
     return () => {
       controller.abort();
@@ -729,21 +712,39 @@ function PracticePageContent() {
     });
   }, [getRecordingState, updateRecordingState]);
 
-  // Handle rating update
-  const handleRateRecording = useCallback((sentenceId: number, slotIndex: number, score: number) => {
-    setRatings(prev => ({
-      ...prev,
-      [sentenceId]: {
-        ...prev[sentenceId],
-        [slotIndex]: score,
-      },
-    }));
-  }, []);
+  // Handle AI scoring
+  const handleStartScoring = useCallback(async (sentenceId: number, slotIndex: number) => {
+    const recordingState = getRecordingState(sentenceId, slotIndex);
+    if (!recordingState.audioUrl || !recordingState.recordingId) return;
 
-  // Get rating for a specific sentence and slot
-  const getRating = useCallback((sentenceId: number, slotIndex: number): number | null => {
-    return ratings[sentenceId]?.[slotIndex] ?? null;
-  }, [ratings]);
+    try {
+      // Set scoring state
+      updateRecordingState(sentenceId, slotIndex, {
+        isScoring: true,
+        score: null,
+        error: null,
+      });
+
+      // Simulate AI scoring with a delay (replace with actual API call later)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Generate a random score between 60-95 for demo
+      const mockScore = Math.floor(Math.random() * 36) + 60;
+
+      updateRecordingState(sentenceId, slotIndex, {
+        isScoring: false,
+        score: mockScore,
+      });
+
+      console.log(`[AI Scoring] Sentence ${sentenceId}, Slot ${slotIndex}: ${mockScore}/100`);
+    } catch (error) {
+      console.error('AI scoring failed:', error);
+      updateRecordingState(sentenceId, slotIndex, {
+        isScoring: false,
+        error: 'SCORING_ERROR',
+      });
+    }
+  }, [getRecordingState, updateRecordingState]);
 
   // Handle upload to server
   const handleUploadRecording = useCallback(async (sentenceId: number, slotIndex: number) => {
@@ -840,18 +841,8 @@ function PracticePageContent() {
         error: null,
         fileSize: null,
         recordingId: null,
-      });
-      setRatings(prev => {
-        if (!prev[sentenceId]) return prev;
-        const next = { ...prev };
-        const sentenceRatings = { ...next[sentenceId] };
-        delete sentenceRatings[slotIndex];
-        if (Object.keys(sentenceRatings).length === 0) {
-          delete next[sentenceId];
-        } else {
-          next[sentenceId] = sentenceRatings;
-        }
-        return next;
+        score: null,
+        isScoring: false,
       });
       return;
     }
@@ -905,24 +896,9 @@ function PracticePageContent() {
         error: null,
         fileSize: null,
         recordingId: null,
+        score: null,
+        isScoring: false,
       });
-
-      setRatings(prev => {
-        if (!prev[sentenceId]) return prev;
-        const next = { ...prev };
-        const sentenceRatings = { ...next[sentenceId] };
-        delete sentenceRatings[slotIndex];
-        if (Object.keys(sentenceRatings).length === 0) {
-          delete next[sentenceId];
-        } else {
-          next[sentenceId] = sentenceRatings;
-        }
-        return next;
-      });
-
-      // if (result.storageWarning) {
-      //   console.warn('Storage deletion warning:', result.storageWarning);
-      // }
     } catch (error) {
       console.error('Delete recording failed:', error);
       const errorCode = error instanceof Error ? error.message : 'DELETE_FAILED';
@@ -974,12 +950,12 @@ function PracticePageContent() {
         <h3 className="text-lg font-semibold text-blue-900 mb-2">使用說明</h3>
         <ul className="text-sm text-blue-800 space-y-1">
           <li>• 點擊「播放原音」聆聽標準發音</li>
-          <li>• 每個句子可以錄製 3 次，每次最多 {maxRecordingSeconds} 秒</li>
+          <li>• 每個句子最多錄製 {maxRecordingSeconds} 秒</li>
           <li>• 點擊圓形按鈕開始錄音，再點擊停止錄音</li>
           <li>• 圓形按鈕背景動畫顯示剩餘時間</li>
           <li>• 錄音完成後可以立即播放聽取</li>
-          <li>• 可以重新錄音覆蓋之前的錄音</li>
           <li className="font-semibold text-blue-900">• ⚠️ 錄音完成後記得按「上傳」按鈕才會儲存到系統</li>
+          <li className="font-semibold text-green-800">• 🎯 上傳後點擊「開始 AI 評分」獲取發音評分</li>
         </ul>
       </div>
 
@@ -1104,7 +1080,7 @@ function PracticePageContent() {
                 </div>
               </div>
 
-              {/* Recording Section - Three recording attempts */}
+              {/* Recording Section - Single recording button */}
               <div className="border-t pt-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base font-medium text-gray-900">錄音練習</h3>
@@ -1115,21 +1091,15 @@ function PracticePageContent() {
                   )}
                 </div>
 
-                {/* Three Recording Buttons */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {[0, 1, 2].map((slotIndex) => {
+                {/* Single Recording Button */}
+                <div className="flex flex-col items-center gap-4">
+                  {(() => {
+                    const slotIndex = 0; // Use only slot 0 for single recording
                     const recordingState = getRecordingState(sentence.id, slotIndex);
                     const hasUploaded = recordingState.audioUrl && !recordingState.audioBlob;
-                    const currentRating = getRating(sentence.id, slotIndex);
 
                     return (
-                      <div key={slotIndex} className="space-y-3">
-                        <div className="text-center">
-                          <span className="text-sm font-medium text-gray-700">
-                            錄音 {slotIndex + 1}
-                          </span>
-                        </div>
-
+                      <>
                         <RecordingButton
                           slotIndex={slotIndex}
                           sentenceId={sentence.id}
@@ -1142,45 +1112,57 @@ function PracticePageContent() {
                           hasPlayedOriginal={playedSentences.has(sentence.id)}
                         />
 
-                        {/* Rating Bar - shown below each recording button */}
-                        <RatingBar
-                          courseId={isCustomCourse ? selectedCourseId : courseId}
-                          sentenceId={sentence.id}
-                          slotIndex={slotIndex}
-                          isLocked={!hasUploaded}
-                          initialRating={currentRating}
-                          onRate={(score) => handleRateRecording(sentence.id, slotIndex, score)}
-                          className="mt-2"
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
+                        {/* AI Scoring Button - shown after recording is uploaded */}
+                        {hasUploaded && (
+                          <button
+                            type="button"
+                            onClick={() => handleStartScoring(sentence.id, slotIndex)}
+                            disabled={recordingState.isScoring}
+                            className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-sm font-medium text-white transition hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                          >
+                            {recordingState.isScoring ? (
+                              <>
+                                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                評分中...
+                              </>
+                            ) : (
+                              <>
+                                <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+                                </svg>
+                                開始 AI 評分
+                              </>
+                            )}
+                          </button>
+                        )}
 
-                {/* Progress Indicator */}
-                <div className="mt-4 flex items-center justify-center">
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <div className="flex gap-1">
-                      {[0, 1, 2].map((slotIndex) => {
-                        const slotState = getRecordingState(sentence.id, slotIndex);
-                        const hasRecording = Boolean(slotState.audioBlob || slotState.audioUrl);
-                        return (
-                          <div
-                            key={slotIndex}
-                            className={`w-2 h-2 rounded-full ${
-                              hasRecording ? 'bg-[#476EAE]' : 'bg-gray-300'
-                            }`}
-                          />
-                        );
-                      })}
-                    </div>
-                    <span>
-                      {[0, 1, 2].filter(slotIndex => {
-                        const state = getRecordingState(sentence.id, slotIndex);
-                        return Boolean(state.audioBlob || state.audioUrl);
-                      }).length} / 3 完成
-                    </span>
-                  </div>
+                        {/* Score Display */}
+                        {recordingState.score !== null && recordingState.score !== undefined && (
+                          <div className="w-full max-w-md p-6 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-xl">
+                            <div className="text-center">
+                              <p className="text-sm text-gray-600 mb-2">AI 評分結果</p>
+                              <div className="flex items-center justify-center gap-3">
+                                <div className="text-5xl font-bold text-blue-600">
+                                  {recordingState.score}
+                                </div>
+                                <div className="text-2xl text-gray-400">/</div>
+                                <div className="text-3xl font-semibold text-gray-600">100</div>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-3">
+                                {recordingState.score >= 90 ? '🌟 優秀！' :
+                                 recordingState.score >= 75 ? '👍 良好！' :
+                                 recordingState.score >= 60 ? '💪 不錯，繼續加油！' :
+                                 '📚 多練習會更好！'}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
               </article>

@@ -22,6 +22,7 @@ export default function CreateCoursePage() {
     title: '',
     description: '',
     maxSentences: 10,
+    introSkipSeconds: 0,
   });
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +120,7 @@ export default function CreateCoursePage() {
         title: formData.title.trim(),
         description: formData.description.trim(),
         maxSentences: formData.maxSentences,
+        introSkipSeconds: formData.introSkipSeconds,
       };
 
       const response = await fetch('/api/courses/create', {
@@ -250,6 +252,28 @@ export default function CreateCoursePage() {
             rows={3}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
+        </div>
+
+        {/* Intro Skip Seconds */}
+        <div className="mb-6">
+          <label htmlFor="introSkipSeconds" className="block text-sm font-medium text-gray-700 mb-2">
+            跳過前奏秒數
+          </label>
+          <input
+            type="number"
+            id="introSkipSeconds"
+            name="introSkipSeconds"
+            value={formData.introSkipSeconds}
+            onChange={handleInputChange}
+            min="0"
+            max="60"
+            step="1"
+            placeholder="0"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          <p className="mt-2 text-sm text-gray-500">
+            如果音檔開頭有前奏或空白，請輸入需要跳過的秒數（0-60秒）
+          </p>
         </div>
 
         {/* Max Sentences */}

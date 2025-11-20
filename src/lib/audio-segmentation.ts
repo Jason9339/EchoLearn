@@ -4,6 +4,18 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
 
+// Set ffmpeg path - use installed binary
+if (typeof window === 'undefined') {
+  try {
+    // Try to find ffmpeg in node_modules
+    const ffmpegPath = path.join(process.cwd(), 'node_modules', '@ffmpeg-installer', 'linux-x64', 'ffmpeg');
+    ffmpeg.setFfmpegPath(ffmpegPath);
+    console.log('[audio-segmentation] Using ffmpeg at:', ffmpegPath);
+  } catch (error) {
+    console.warn('[audio-segmentation] Failed to set ffmpeg path:', error);
+  }
+}
+
 /**
  * Audio segmentation service using FFmpeg
  * Handles downloading, segmenting, and uploading audio files
@@ -40,8 +52,62 @@ async function downloadAudioFile(audioUrl: string): Promise<string> {
 
   await fs.writeFile(filePath, Buffer.from(buffer));
   console.log(`[audio-segmentation] Downloaded audio to: ${filePath}`);
-  
+
   return filePath;
+}
+
+/**
+ * Trim intro from audio file using FFmpeg
+ * @param inputPath - Path to the input audio file
+ * @param introSkipSeconds - Number of seconds to skip from the beginning
+ * @returns Path to the trimmed audio file
+ */
+export async function trimIntroFromAudio(inputPath: string, introSkipSeconds: number): Promise<string> {
+  if (introSkipSeconds <= 0) {
+    return inputPath; // No trimming needed
+  }
+
+  const tempDir = os.tmpdir();
+  // Keep the same file extension as input
+  const inputExtension = path.extname(inputPath);
+  const outputFileName = `audio_trimmed_${Date.now()}${inputExtension}`;
+  const outputPath = path.join(tempDir, outputFileName);
+
+  console.log(`[audio-segmentation] Trimming ${introSkipSeconds}s from beginning of audio`);
+
+  await new Promise<void>((resolve, reject) => {
+    const command = ffmpeg(inputPath)
+      .seekInput(introSkipSeconds) // Skip the intro
+      .audioCodec('copy') // Copy codec without re-encoding to preserve quality and size
+      .output(outputPath)
+      .on('start', (commandLine) => {
+        console.log(`[audio-segmentation] Trim FFmpeg command: ${commandLine}`);
+      })
+      .on('end', async () => {
+        // Check file size
+        try {
+          const stats = await fs.stat(outputPath);
+          const fileSizeMB = stats.size / (1024 * 1024);
+          console.log(`[audio-segmentation] Intro trimmed successfully: ${outputPath} (${fileSizeMB.toFixed(2)} MB)`);
+
+          // Whisper API has a 25 MB limit
+          if (stats.size > 25 * 1024 * 1024) {
+            console.warn(`[audio-segmentation] Warning: Trimmed file is ${fileSizeMB.toFixed(2)} MB, which exceeds Whisper's 25 MB limit`);
+          }
+        } catch (error) {
+          console.warn('[audio-segmentation] Failed to check file size:', error);
+        }
+        resolve();
+      })
+      .on('error', (err) => {
+        console.error(`[audio-segmentation] FFmpeg trim error:`, err);
+        reject(err);
+      });
+
+    command.run();
+  });
+
+  return outputPath;
 }
 
 /**
@@ -57,17 +123,42 @@ async function segmentAudioFile(
   const tempDir = os.tmpdir();
   const segmentedFiles: { sentenceId: number; filePath: string }[] = [];
 
-  console.log(`[audio-segmentation] Starting segmentation of ${segments.length} segments`);
+  // Padding in seconds - add buffer before and after each segment
+  const PADDING_BEFORE = 0.15; // 150ms before to catch any early sounds
+  const PADDING_AFTER = 0.15;  // 150ms after to avoid cutting off trailing sounds
+                               // Not too long to avoid overlapping with next sentence
 
-  for (const segment of segments) {
+  console.log(`[audio-segmentation] Starting segmentation of ${segments.length} segments`);
+  console.log(`[audio-segmentation] Using padding: ${PADDING_BEFORE}s before, ${PADDING_AFTER}s after`);
+
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
     const outputFileName = `segment_${segment.sentenceId}_${Date.now()}.wav`;
     const outputPath = path.join(tempDir, outputFileName);
 
     try {
+      // Apply padding but ensure we don't go below 0
+      const startTime = Math.max(0, segment.startTime - PADDING_BEFORE);
+
+      // Check if there's a next segment to avoid overlapping
+      const nextSegment = segments[i + 1];
+      let endTime = segment.endTime + PADDING_AFTER;
+
+      // If padding would overlap with next segment, reduce it
+      if (nextSegment && endTime > nextSegment.startTime) {
+        // Leave a small gap (50ms) between segments
+        endTime = Math.min(endTime, nextSegment.startTime - 0.05);
+        console.log(`[audio-segmentation] Segment ${segment.sentenceId}: Reduced end padding to avoid overlap with next segment`);
+      }
+
+      const duration = endTime - startTime;
+
+      console.log(`[audio-segmentation] Segment ${segment.sentenceId}: ${segment.startTime.toFixed(2)}s -> ${segment.endTime.toFixed(2)}s (with padding: ${startTime.toFixed(2)}s -> ${endTime.toFixed(2)}s)`);
+
       await new Promise<void>((resolve, reject) => {
         ffmpeg(inputPath)
-          .seekInput(segment.startTime) // Start time in seconds
-          .duration(segment.endTime - segment.startTime) // Duration in seconds
+          .seekInput(startTime) // Start time with padding
+          .duration(duration) // Duration with padding
           .audioCodec('pcm_s16le') // Use PCM codec for compatibility
           .audioFrequency(44100) // Standard sample rate
           .audioChannels(1) // Mono audio

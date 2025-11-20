@@ -33,6 +33,7 @@ export type UserCourse = {
   title: string;
   description: string;
   maxSentences: number;
+  introSkipSeconds?: number;
   status: 'processing' | 'completed' | 'failed';
   originalAudioUrl?: string;
   createdAt: string;
@@ -68,6 +69,7 @@ export type CreateCourseRequest = {
   title: string;
   description: string;
   maxSentences: number;
+  introSkipSeconds?: number;
 };
 
 export type CreateCourseResponse = {
@@ -82,6 +84,7 @@ export type CourseStatusResponse = {
   status?: 'processing' | 'completed' | 'failed';
   progress?: number;
   errorMessage?: string;
+  processingMessage?: string;
   sentences?: CourseSentence[];
   error?: string;
 };

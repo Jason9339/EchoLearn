@@ -47,6 +47,78 @@ export async function transcribeAudio(audioFile: File): Promise<{
 }
 
 /**
+ * Detect the first actual speech segment (skip intro/silence)
+ * @param segments - Whisper segments with timestamps
+ * @returns Index of first real speech segment
+ */
+function detectFirstSpeechSegment(
+  segments: Array<{
+    id: number;
+    start: number;
+    end: number;
+    text: string;
+  }>
+): number {
+  if (segments.length === 0) return 0;
+
+  // Strategy 1: Look for the first segment with meaningful content
+  for (let i = 0; i < Math.min(10, segments.length); i++) {
+    const segment = segments[i];
+    const text = segment.text.trim();
+    const wordCount = text.split(/\s+/).length;
+
+    // Skip very short segments (likely noise/music)
+    if (text.length < 3) continue;
+
+    // Consider it real speech if:
+    // 1. Has at least 3 words, AND
+    // 2. Contains actual letters/characters (not just punctuation or noise)
+    const hasWords = wordCount >= 3;
+    const hasLetters = /[a-zA-Z\u4e00-\u9fa5]{2,}/.test(text);
+
+    if (hasWords && hasLetters) {
+      console.log(`[detectFirstSpeechSegment] Found first speech at segment ${i}: "${text.substring(0, 50)}..."`);
+      return i;
+    }
+  }
+
+  // Strategy 2: Check if first segment looks like intro music/silence
+  // Intro segments often have:
+  // - Very short text (Whisper transcribes music as gibberish)
+  // - OR starts from 0 but has no real words
+  const firstSegment = segments[0];
+  if (firstSegment) {
+    const firstText = firstSegment.text.trim();
+    const hasRealWords = /\b[a-zA-Z]{3,}\b|\p{Script=Han}{2,}/u.test(firstText);
+
+    // If first segment starts at 0 and has no real words, it's likely intro
+    if (firstSegment.start < 0.5 && !hasRealWords && firstText.length < 20) {
+      console.log(`[detectFirstSpeechSegment] First segment appears to be intro music/noise: "${firstText}"`);
+      // Skip to segment 1 if it exists
+      if (segments.length > 1) {
+        console.log(`[detectFirstSpeechSegment] Skipping to segment 1`);
+        return 1;
+      }
+    }
+  }
+
+  // Strategy 3: If we still haven't found speech, use time-based approach
+  // Look for first segment that starts after 1 second with meaningful text
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+    const hasContent = /[a-zA-Z\u4e00-\u9fa5]{5,}/.test(segment.text);
+    if (segment.start >= 1 && hasContent) {
+      console.log(`[detectFirstSpeechSegment] Using time-based detection, starting at segment ${i} (${segment.start}s)`);
+      return i;
+    }
+  }
+
+  // Fallback: use first segment
+  console.log('[detectFirstSpeechSegment] No intro detected, starting from segment 0');
+  return 0;
+}
+
+/**
  * Split transcription segments into sentences with audio timing
  * @param segments - Whisper segments with timestamps
  * @param maxSentences - Maximum number of sentences to generate
@@ -66,6 +138,10 @@ export function splitIntoSentences(
   startTime: number;
   endTime: number;
 }> {
+  if (segments.length === 0) {
+    return [];
+  }
+
   const sentences: Array<{
     sentenceId: number;
     text: string;
@@ -73,17 +149,30 @@ export function splitIntoSentences(
     endTime: number;
   }> = [];
 
+  // Log first few segments for debugging
+  console.log(`[splitIntoSentences] Total segments from Whisper: ${segments.length}`);
+  segments.slice(0, 3).forEach((seg, i) => {
+    console.log(`[splitIntoSentences] Segment ${i}: ${seg.start.toFixed(2)}s-${seg.end.toFixed(2)}s: "${seg.text.substring(0, 50)}..."`);
+  });
+
+  // Detect and skip intro/silence segments
+  const firstSpeechIndex = detectFirstSpeechSegment(segments);
+  console.log(`[splitIntoSentences] Skipping ${firstSpeechIndex} intro segments, starting from segment ${firstSpeechIndex}`);
+
   let currentSentence = '';
   let currentStartTime = 0;
   let sentenceId = 1;
 
-  for (const segment of segments) {
+  // Start from the first real speech segment
+  for (let i = firstSpeechIndex; i < segments.length; i++) {
+    const segment = segments[i];
+
     if (sentences.length >= maxSentences) {
       break;
     }
 
     const segmentText = segment.text.trim();
-    
+
     // If this is the start of a new sentence
     if (currentSentence === '') {
       currentStartTime = segment.start;
@@ -93,7 +182,7 @@ export function splitIntoSentences(
 
     // Check if this segment ends a sentence (contains punctuation)
     const endsWithPunctuation = /[.!?。！？]$/.test(segmentText);
-    
+
     // Or if the sentence is getting too long (more than 20 words)
     const wordCount = currentSentence.split(/\s+/).length;
     const isTooLong = wordCount > 20;

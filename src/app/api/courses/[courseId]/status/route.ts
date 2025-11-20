@@ -45,12 +45,13 @@ export async function GET(
 
     // Get course information and verify ownership
     const courseResult = await sql`
-      SELECT 
+      SELECT
         uc.status,
         uc.title,
         uc.description,
         apj.progress,
-        apj.error_message as "errorMessage"
+        apj.error_message as "errorMessage",
+        apj.processing_message as "processingMessage"
       FROM user_courses uc
       LEFT JOIN audio_processing_jobs apj ON apj.course_id = uc.id
       WHERE uc.id = ${courseId} AND uc.user_id = ${userId}
@@ -68,6 +69,7 @@ export async function GET(
     const status = course.status as 'processing' | 'completed' | 'failed';
     const progress = parseInt(String(course.progress)) || 0;
     const errorMessage = course.errorMessage || undefined;
+    const processingMessage = course.processingMessage || undefined;
 
     // If course is completed, get sentences
     let sentences: CourseSentence[] = [];
@@ -104,6 +106,7 @@ export async function GET(
       status,
       progress,
       errorMessage,
+      processingMessage,
       sentences: sentences.length > 0 ? sentences : undefined,
     } as CourseStatusResponse);
 

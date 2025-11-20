@@ -8,7 +8,7 @@ const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 /**
  * Process audio in background by calling the process-audio API
  */
-async function processAudioInBackground(courseId: string, audioUrl: string): Promise<void> {
+async function processAudioInBackground(courseId: string, audioUrl: string, introSkipSeconds?: number): Promise<void> {
   try {
     // Get the base URL for internal API calls
     const baseUrl =
@@ -18,7 +18,7 @@ async function processAudioInBackground(courseId: string, audioUrl: string): Pro
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ||
       // Fallback to the current dev server port (default 3000)
       `http://localhost:${process.env.PORT || 3000}`;
-    
+
     // Call the process-audio API internally
     const response = await fetch(`${baseUrl}/api/courses/process-audio`, {
       method: 'POST',
@@ -30,6 +30,7 @@ async function processAudioInBackground(courseId: string, audioUrl: string): Pro
       body: JSON.stringify({
         courseId,
         audioUrl,
+        introSkipSeconds: introSkipSeconds || 0,
       }),
     });
 
@@ -93,13 +94,13 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const body: CreateCourseRequest = await request.json();
-    const { tempId, title, description, maxSentences } = body;
+    const { tempId, title, description, maxSentences, introSkipSeconds } = body;
 
     // Validate input
     if (!tempId || !title || !maxSentences) {
-      return Response.json({ 
-        success: false, 
-        error: 'Missing required fields' 
+      return Response.json({
+        success: false,
+        error: 'Missing required fields'
       } as CreateCourseResponse, { status: 400 });
     }
 
@@ -208,9 +209,9 @@ export async function POST(request: Request): Promise<Response> {
 
     // Trigger background processing immediately
     console.log(`Created course ${courseId} with job ${jobId} for user ${userId}`);
-    
+
     // Start processing in the background (don't wait for completion)
-    processAudioInBackground(String(courseId), audioUrl).catch(error => {
+    processAudioInBackground(String(courseId), audioUrl, introSkipSeconds).catch(error => {
       console.error('Background processing failed:', error);
     });
 

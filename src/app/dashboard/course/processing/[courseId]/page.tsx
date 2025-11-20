@@ -15,6 +15,7 @@ export default function ProcessingPage() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [sentenceCount, setSentenceCount] = useState(0);
+  const [processingMessage, setProcessingMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!courseId) return;
@@ -38,6 +39,7 @@ export default function ProcessingPage() {
         setProgress(result.progress || 0);
         setError(result.errorMessage || null);
         setSentenceCount(result.sentences?.length || 0);
+        setProcessingMessage(result.processingMessage || null);
 
         // If completed, redirect to course page after a short delay
         if (result.status === 'completed') {
@@ -165,13 +167,41 @@ export default function ProcessingPage() {
 
           {/* Success Message */}
           {status === 'completed' && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md">
-              <div className="flex items-center justify-center">
-                <CheckCircleIcon className="h-5 w-5 text-green-500 mr-2" />
-                <p className="text-sm text-green-600">
-                  課程創建成功！3 秒後自動跳轉...
-                </p>
+            <div className="mb-6 space-y-3">
+              <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+                <div className="flex items-center justify-center">
+                  <CheckCircleIcon className="h-5 w-5 text-green-500 mr-2" />
+                  <p className="text-sm text-green-600">
+                    課程創建成功！3 秒後自動跳轉...
+                  </p>
+                </div>
               </div>
+
+              {/* Processing Method Info */}
+              {processingMessage && (
+                <div className={`p-4 border rounded-md ${
+                  processingMessage.includes('測試資料') || processingMessage.includes('mock')
+                    ? 'bg-yellow-50 border-yellow-200'
+                    : 'bg-blue-50 border-blue-200'
+                }`}>
+                  <div className="flex items-start">
+                    <svg className={`h-5 w-5 mt-0.5 mr-2 flex-shrink-0 ${
+                      processingMessage.includes('測試資料') || processingMessage.includes('mock')
+                        ? 'text-yellow-600'
+                        : 'text-blue-600'
+                    }`} fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    <p className={`text-sm ${
+                      processingMessage.includes('測試資料') || processingMessage.includes('mock')
+                        ? 'text-yellow-700'
+                        : 'text-blue-700'
+                    }`}>
+                      {processingMessage}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

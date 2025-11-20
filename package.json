@@ -10,6 +10,7 @@
     "migrate:user-courses": "node scripts/run-user-courses-migration.js"
   },
   "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@heroicons/react": "^2.2.0",
     "@supabase/supabase-js": "^2.75.0",
     "@types/fluent-ffmpeg": "^2.1.28",

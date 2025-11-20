@@ -1,6 +1,10 @@
 import { auth } from '@/auth';
 import postgres from 'postgres';
 import { transcribeAudio, splitIntoSentences, generateAudioSegments, isOpenAIConfigured } from '@/lib/openai';
+import { trimIntroFromAudio } from '@/lib/audio-segmentation';
+import { promises as fs } from 'fs';
+import path from 'path';
+import os from 'os';
 
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
@@ -14,21 +18,23 @@ const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 export async function POST(request: Request): Promise<Response> {
   let courseId: string;
   let audioUrl: string;
+  let introSkipSeconds: number;
 
   try {
     // Parse request body once and store the values
     const body = await request.json();
     courseId = body.courseId;
     audioUrl = body.audioUrl;
+    introSkipSeconds = Number(body.introSkipSeconds) || 0;
 
     if (!courseId || !audioUrl) {
-      return Response.json({ 
-        success: false, 
-        error: 'Missing courseId or audioUrl' 
+      return Response.json({
+        success: false,
+        error: 'Missing courseId or audioUrl'
       }, { status: 400 });
     }
 
-    console.log(`[process-audio] Starting processing for course: ${courseId}, audioUrl: ${audioUrl}`);
+    console.log(`[process-audio] Starting processing for course: ${courseId}, audioUrl: ${audioUrl}, introSkipSeconds: ${introSkipSeconds}`);
 
   } catch (parseError) {
     console.error('[process-audio] Failed to parse request body:', parseError);
@@ -150,7 +156,7 @@ export async function POST(request: Request): Promise<Response> {
 
       await sql`
         UPDATE audio_processing_jobs
-        SET status = 'completed', progress = 100, updated_at = NOW()
+        SET status = 'completed', progress = 100, processing_message = '使用測試資料生成課程（OpenAI API 未配置）', updated_at = NOW()
         WHERE course_id = ${courseId}
       `;
 
@@ -171,9 +177,41 @@ export async function POST(request: Request): Promise<Response> {
     if (!audioResponse.ok) {
       throw new Error('Failed to download audio file');
     }
-    
+
     const audioBuffer = await audioResponse.arrayBuffer();
-    const audioFile = new File([audioBuffer], 'audio.wav', { type: 'audio/wav' });
+
+    // Save to temporary file - keep original format (likely MP3)
+    const tempDir = os.tmpdir();
+    // Detect file format from URL or use mp3 as default
+    const urlPath = new URL(audioUrl).pathname;
+    const extension = urlPath.substring(urlPath.lastIndexOf('.')).toLowerCase() || '.mp3';
+    const tempFileName = `audio_${Date.now()}${extension}`;
+    const tempFilePath = path.join(tempDir, tempFileName);
+    await fs.writeFile(tempFilePath, Buffer.from(audioBuffer));
+    console.log(`[process-audio] Downloaded audio to: ${tempFilePath}`);
+
+    // Trim intro if specified
+    let processedFilePath = tempFilePath;
+    if (introSkipSeconds > 0) {
+      console.log(`[process-audio] Trimming ${introSkipSeconds}s intro from audio...`);
+      processedFilePath = await trimIntroFromAudio(tempFilePath, introSkipSeconds);
+      console.log(`[process-audio] Intro trimmed, new file: ${processedFilePath}`);
+    }
+
+    // Read the processed file for Whisper
+    const processedBuffer = await fs.readFile(processedFilePath);
+
+    // Detect the actual file format to set correct MIME type
+    const fileExtension = path.extname(processedFilePath).toLowerCase();
+    const mimeType = fileExtension === '.mp3' ? 'audio/mpeg' :
+                     fileExtension === '.wav' ? 'audio/wav' :
+                     fileExtension === '.m4a' ? 'audio/mp4' :
+                     fileExtension === '.ogg' ? 'audio/ogg' :
+                     'audio/mpeg'; // default to mp3
+
+    const audioFile = new File([new Uint8Array(processedBuffer)], `audio${fileExtension}`, { type: mimeType });
+
+    console.log(`[process-audio] Prepared audio file for Whisper: ${fileExtension}, ${mimeType}, ${(processedBuffer.length / (1024 * 1024)).toFixed(2)} MB`);
 
     // Update progress
     await sql`
@@ -186,6 +224,16 @@ export async function POST(request: Request): Promise<Response> {
     console.log('[process-audio] Transcribing audio with Whisper API...');
     const transcription = await transcribeAudio(audioFile);
 
+    // Clean up temporary files
+    try {
+      await fs.unlink(tempFilePath);
+      if (processedFilePath !== tempFilePath) {
+        await fs.unlink(processedFilePath);
+      }
+    } catch (cleanupError) {
+      console.warn('[process-audio] Failed to cleanup temp files:', cleanupError);
+    }
+
     // Update progress
     await sql`
       UPDATE audio_processing_jobs
@@ -196,6 +244,17 @@ export async function POST(request: Request): Promise<Response> {
     // Split into sentences
     console.log('[process-audio] Splitting transcription into sentences...');
     const sentences = splitIntoSentences(transcription.segments, maxSentences);
+
+    // Adjust timestamps if intro was skipped
+    // Whisper timestamps are relative to the trimmed audio (starting at 0)
+    // We need to add introSkipSeconds to map them back to the original audio
+    if (introSkipSeconds > 0) {
+      console.log(`[process-audio] Adjusting timestamps by +${introSkipSeconds}s to match original audio`);
+      sentences.forEach(sentence => {
+        sentence.startTime = Number(sentence.startTime) + introSkipSeconds;
+        sentence.endTime = Number(sentence.endTime) + introSkipSeconds;
+      });
+    }
 
     // Update progress
     await sql`
@@ -229,7 +288,7 @@ export async function POST(request: Request): Promise<Response> {
 
     await sql`
       UPDATE audio_processing_jobs
-      SET status = 'completed', progress = 100, updated_at = NOW()
+      SET status = 'completed', progress = 100, processing_message = '使用 OpenAI Whisper API 成功處理音檔', updated_at = NOW()
       WHERE course_id = ${courseId}
     `;
 

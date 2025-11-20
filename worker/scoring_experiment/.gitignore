@@ -1,0 +1,32 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Data (if large)
+data/*.csv
+data/*.json
+
+# Models
+models/*.pkl
+models/*.joblib
+models/*.h5
+
+# Results
+results/*.png
+results/*.pdf
+
+# Keep structure
+!data/.gitkeep
+!models/.gitkeep
+!results/.gitkeep

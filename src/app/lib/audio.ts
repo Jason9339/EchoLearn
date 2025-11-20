@@ -77,9 +77,14 @@ export function getOptimalAudioConstraints(): MediaStreamConstraints {
  * Validate audio file
  * @param file - File to validate
  * @param maxSizeBytes - Maximum file size in bytes (default: 500KB)
+ * @param maxDurationSeconds - Maximum audio duration in seconds (optional)
  * @returns Validation result
  */
-export function validateAudioFile(file: File, maxSizeBytes: number = 500 * 1024): {
+export function validateAudioFile(
+  file: File,
+  maxSizeBytes: number = 500 * 1024,
+  maxDurationSeconds?: number
+): {
   isValid: boolean;
   error?: string;
 } {
@@ -90,6 +95,10 @@ export function validateAudioFile(file: File, maxSizeBytes: number = 500 * 1024)
     'audio/mp4',
     'audio/ogg',
     'audio/wav',
+    'audio/mpeg',
+    'audio/mp3',
+    'audio/x-wav',
+    'audio/m4a',
   ];
 
   if (!allowedTypes.includes(file.type)) {
@@ -114,6 +123,9 @@ export function validateAudioFile(file: File, maxSizeBytes: number = 500 * 1024)
       error: '檔案為空',
     };
   }
+
+  // Note: Duration validation should be done in the frontend with Web Audio API
+  // as we cannot easily check duration on the server without additional dependencies
 
   return { isValid: true };
 }

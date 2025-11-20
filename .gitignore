@@ -44,6 +44,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+venv
+
 # python
 __pycache__/
 
@@ -54,3 +56,4 @@ cloudflared-linux-amd64.deb
 # worker temp files
 /worker/temp/*
 !/worker/temp/.gitkeep
+

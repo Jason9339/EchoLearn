@@ -1,0 +1,67 @@
+{
+  "models_comparison": {
+    "\u52a0\u6b0a\u5e73\u5747": {
+      "train_mae": 1.024265667792377,
+      "test_mae": 1.1159374292474495,
+      "test_rmse": 1.3820110432278998,
+      "test_r2": -0.5046164892749938
+    },
+    "\u7dda\u6027\u56de\u6b78": {
+      "train_mae": 0.8152163935835091,
+      "test_mae": 0.8487692427684653,
+      "test_rmse": 1.0335257522304244,
+      "test_r2": 0.1585169062547882
+    },
+    "\u96a8\u6a5f\u68ee\u6797": {
+      "train_mae": 0.5197602808491951,
+      "test_mae": 0.7743293666108433,
+      "test_rmse": 0.9648827016523268,
+      "test_r2": 0.2665815495650379
+    }
+  },
+  "best_model": "\u96a8\u6a5f\u68ee\u6797",
+  "metric_columns": [
+    "score_PER",
+    "score_PPG",
+    "score_WER",
+    "score_GOP",
+    "score_GPE_offset",
+    "score_FFE",
+    "score_Energy",
+    "score_VDE"
+  ],
+  "metric_info": {
+    "score_PER": {
+      "reverse": true,
+      "weight": 0.31
+    },
+    "score_PPG": {
+      "reverse": false,
+      "weight": 0.31
+    },
+    "score_WER": {
+      "reverse": true,
+      "weight": 0.29
+    },
+    "score_GOP": {
+      "reverse": false,
+      "weight": 0.08
+    },
+    "score_GPE_offset": {
+      "reverse": false,
+      "weight": 0.15
+    },
+    "score_FFE": {
+      "reverse": false,
+      "weight": 0.07
+    },
+    "score_Energy": {
+      "reverse": false,
+      "weight": 0.23
+    },
+    "score_VDE": {
+      "reverse": false,
+      "weight": 0.16
+    }
+  }
+}

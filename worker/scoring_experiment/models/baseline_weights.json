@@ -1,0 +1,47 @@
+{
+  "method": "weighted_average",
+  "weights": {
+    "score_PER": 0.31,
+    "score_PPG": 0.31,
+    "score_WER": 0.29,
+    "score_GOP": 0.08,
+    "score_GPE_offset": 0.15,
+    "score_FFE": 0.07,
+    "score_Energy": 0.23,
+    "score_VDE": 0.16
+  },
+  "metric_info": {
+    "score_PER": {
+      "reverse": true,
+      "weight": 0.31
+    },
+    "score_PPG": {
+      "reverse": false,
+      "weight": 0.31
+    },
+    "score_WER": {
+      "reverse": true,
+      "weight": 0.29
+    },
+    "score_GOP": {
+      "reverse": false,
+      "weight": 0.08
+    },
+    "score_GPE_offset": {
+      "reverse": false,
+      "weight": 0.15
+    },
+    "score_FFE": {
+      "reverse": false,
+      "weight": 0.07
+    },
+    "score_Energy": {
+      "reverse": false,
+      "weight": 0.23
+    },
+    "score_VDE": {
+      "reverse": false,
+      "weight": 0.16
+    }
+  }
+}

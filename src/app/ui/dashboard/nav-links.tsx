@@ -4,7 +4,6 @@ import {
   HomeIcon,
   BookOpenIcon,
   UserCircleIcon,
-  UsersIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -19,11 +18,12 @@ const links = [
     href: '/dashboard/course',
     icon: BookOpenIcon,
   },
-  {
-    name: 'Peer Review',
-    href: '/dashboard/peer-review',
-    icon: UsersIcon,
-  },
+  // Peer Review feature temporarily hidden for application mode
+  // {
+  //   name: 'Peer Review',
+  //   href: '/dashboard/peer-review',
+  //   icon: UsersIcon,
+  // },
   {
     name: 'My Profile',
     href: '/dashboard/profile',

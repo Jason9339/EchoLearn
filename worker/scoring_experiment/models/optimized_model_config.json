@@ -1,0 +1,68 @@
+{
+  "model_type": "random_forest",
+  "version": "optimized_v1",
+  "min_raters": 3,
+  "hyperparameters": {
+    "n_estimators": 100,
+    "max_depth": 10,
+    "min_samples_split": 5,
+    "min_samples_leaf": 2
+  },
+  "training_samples": 270,
+  "test_metrics": {
+    "mae": 0.6835339088736629,
+    "rmse": 0.8534060017159953,
+    "r2": 0.2632978718948257,
+    "exact_accuracy": 0.4444444444444444,
+    "within_1_star": 0.7962962962962963
+  },
+  "cross_validation": {
+    "cv_mae_mean": 0.7425119752777014,
+    "cv_mae_std": 0.07842358378513693
+  },
+  "improvement_over_baseline": 11.722341615179781,
+  "metric_info": {
+    "score_PER": {
+      "reverse": true,
+      "weight": 0.31
+    },
+    "score_PPG": {
+      "reverse": false,
+      "weight": 0.31
+    },
+    "score_WER": {
+      "reverse": true,
+      "weight": 0.29
+    },
+    "score_GOP": {
+      "reverse": false,
+      "weight": 0.08
+    },
+    "score_GPE_offset": {
+      "reverse": false,
+      "weight": 0.15
+    },
+    "score_FFE": {
+      "reverse": false,
+      "weight": 0.07
+    },
+    "score_Energy": {
+      "reverse": false,
+      "weight": 0.23
+    },
+    "score_VDE": {
+      "reverse": false,
+      "weight": 0.16
+    }
+  },
+  "feature_columns": [
+    "score_PER",
+    "score_PPG",
+    "score_WER",
+    "score_GOP",
+    "score_GPE_offset",
+    "score_FFE",
+    "score_Energy",
+    "score_VDE"
+  ]
+}

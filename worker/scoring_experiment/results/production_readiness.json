@@ -1,0 +1,20 @@
+{
+  "overall_score": 90,
+  "metrics": {
+    "mae": 0.5707150255072742,
+    "rmse": 0.7216269361652566,
+    "median_error": 0.4794449089600884,
+    "exact_accuracy": 0.4734726688102894,
+    "within_1_star": 0.8528938906752411,
+    "within_half_star": 0.5209003215434084,
+    "large_error_rate": 4.09967845659164,
+    "overall_bias": 0.015338696129692762
+  },
+  "grades": {
+    "accuracy": "A",
+    "stability": "A",
+    "bias_control": "A+"
+  },
+  "recommendation": "強烈建議部署",
+  "sample_count": 1244
+}

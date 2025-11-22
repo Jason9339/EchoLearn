@@ -1,8 +1,6 @@
 import { auth } from '@/auth';
-import postgres from 'postgres';
+import sql from '@/lib/postgres';
 import type { CourseStatusResponse, CourseSentence } from '@/app/lib/definitions';
-
-const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
 /**
  * GET /api/courses/[courseId]/status

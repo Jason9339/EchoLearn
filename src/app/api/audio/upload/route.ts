@@ -8,9 +8,7 @@ import {
 } from '@/app/lib/audio';
 import { getSlotLabel } from '@/types/audio';
 import { getSupabaseAdmin } from '@/app/lib/supabase';
-import postgres from 'postgres';
-
-const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+import sql from '@/lib/postgres';
 
 /**
  * POST /api/audio/upload

@@ -1,8 +1,6 @@
 import { auth } from '@/auth';
-import postgres from 'postgres';
+import sql from '@/lib/postgres';
 import { getSupabaseAdmin } from '@/app/lib/supabase';
-
-const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
 /**
  * DELETE /api/courses/[courseId]/delete

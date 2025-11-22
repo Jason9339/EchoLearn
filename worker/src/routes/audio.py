@@ -5,6 +5,10 @@
 """
 from flask import Blueprint, request, jsonify
 from services.audio_service import transcribe_audio, analyze_pronunciation
+from services.audio_scorer import AudioScorer
+import tempfile
+import os
+import subprocess
 
 # 創建 Blueprint
 audio_bp = Blueprint('audio', __name__)
@@ -112,3 +116,74 @@ def health_check():
         "service": "audio-processing",
         "status": "ready for implementation"
     })
+
+
+@audio_bp.route('/score', methods=['POST'])
+def score_audio():
+    """
+    接收參考音檔與測試音檔，並回傳所有評分指標
+
+    Request:
+        - reference_audio: 參考音訊檔案 (multipart/form-data)
+        - test_audio: 要評分的音訊檔案 (multipart/form-data)
+
+    Response:
+        {
+            "success": true,
+            "scores": {
+                'PER': float,
+                'PPG': float,
+                'GOP': float,
+                'GPE_offset': float,
+                'FFE': float,
+                'WER': float,
+                'Energy': float,
+                'VDE': float
+            }
+        }
+    """
+    try:
+        reference_audio = request.files.get('reference_audio')
+        test_audio = request.files.get('test_audio')
+
+        if not reference_audio or not test_audio:
+            return jsonify({"success": False, "error": "Missing files"}), 400
+
+        # === 將兩個音檔存到暫存檔 ===
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as ref_tmp:
+            ref_path = ref_tmp.name
+            reference_audio.save(ref_path)
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as test_tmp:
+            test_path = test_tmp.name
+            test_audio.save(test_path)
+
+        # === 如果上傳的是 webm 格式，轉成 wav 格式 ===
+        wav_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+        wav_path = wav_tmp.name
+        wav_tmp.close()
+
+        # ffmpeg 轉檔
+        subprocess.run([
+            "ffmpeg", "-y", "-i", test_path, wav_path
+        ], check=True)
+
+        # === 呼叫你的 AudioScorer（它需要檔案路徑，不是 ndarray）===
+        scorer = AudioScorer()
+        scores = scorer.score(ref_path, wav_path)
+
+        return jsonify({
+            "success": True,
+            "scores": scores
+        })
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        # 無論成功失敗都刪掉暫存檔
+        try:
+            os.remove(ref_path)
+            os.remove(test_path)
+            os.remove(wav_path)
+        except Exception:
+            pass

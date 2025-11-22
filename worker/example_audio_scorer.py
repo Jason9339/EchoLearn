@@ -48,6 +48,9 @@ def main():
 
     scores = scorer.score(reference, test_audio)
 
+    print(scores)
+    exit()
+
     print("評分結果:")
     for metric, score in scores.items():
         print(f"  {metric:12s}: {score:.4f}")

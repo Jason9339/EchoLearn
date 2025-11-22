@@ -715,7 +715,18 @@ function PracticePageContent() {
   // Handle AI scoring
   const handleStartScoring = useCallback(async (sentenceId: number, slotIndex: number) => {
     const recordingState = getRecordingState(sentenceId, slotIndex);
-    if (!recordingState.audioUrl || !recordingState.recordingId) return;
+    const sentence = sentences.find(s => s.id === sentenceId);
+
+    if (!recordingState.audioUrl || !recordingState.recordingId) {
+      console.error("User recording not found or not uploaded.");
+      updateRecordingState(sentenceId, slotIndex, { error: 'RECORDING_MISSING' });
+      return;
+    }
+    if (!sentence || !sentence.audioSrc) {
+      console.error("Reference sentence or audio source not found.");
+      updateRecordingState(sentenceId, slotIndex, { error: 'REFERENCE_AUDIO_MISSING' });
+      return;
+    }
 
     try {
       // Set scoring state
@@ -725,18 +736,56 @@ function PracticePageContent() {
         error: null,
       });
 
-      // Simulate AI scoring with a delay (replace with actual API call later)
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // 1. Fetch audio data for both reference and test recordings
+      const [refResponse, testResponse] = await Promise.all([
+        fetch(sentence.audioSrc),
+        fetch(recordingState.audioUrl)
+      ]);
 
-      // Generate a random score between 0-5 for demo
-      const mockScore = Math.floor(Math.random() * 6); // 0, 1, 2, 3, 4, or 5
+      if (!refResponse.ok || !testResponse.ok) {
+        throw new Error('Failed to fetch audio files for scoring.');
+      }
 
-      updateRecordingState(sentenceId, slotIndex, {
-        isScoring: false,
-        score: mockScore,
+      const [refBlob, testBlob] = await Promise.all([
+        refResponse.blob(),
+        testResponse.blob()
+      ]);
+
+      // 2. Create FormData and append files
+      const formData = new FormData();
+      formData.append('reference_audio', refBlob, 'reference.wav');
+      formData.append('test_audio', testBlob, 'test.wav');
+
+      // 3. Call the backend API via the Next.js proxy
+      const apiResponse = await fetch('/api/worker/audio/score', {
+        method: 'POST',
+        body: formData,
       });
 
-      console.log(`[AI Scoring] Sentence ${sentenceId}, Slot ${slotIndex}: ${mockScore}/5`);
+      if (!apiResponse.ok) {
+        const errorText = await apiResponse.text();
+        console.error('AI scoring API failed:', errorText);
+        throw new Error(`API Error: ${apiResponse.statusText}`);
+      }
+
+      const result = await apiResponse.json();
+
+      if (result.success && result.scores) {
+        // 4. Process scores and calculate a final score (0-5)
+        const { PER, PPG, GOP, WER } = result.scores;
+        // Simple average of key metrics, scaled to 5.
+        const avgScore = (PER + PPG + GOP + WER) / 4;
+        const finalScore = Math.round(avgScore * 5);
+
+        updateRecordingState(sentenceId, slotIndex, {
+          isScoring: false,
+          score: finalScore,
+        });
+        console.log(`[AI Scoring] Sentence ${sentenceId}, Slot ${slotIndex}: ${finalScore}/5`, result.scores);
+      } else {
+        throw new Error(result.error || 'Scoring failed, invalid response from server.');
+      }
+
     } catch (error) {
       console.error('AI scoring failed:', error);
       updateRecordingState(sentenceId, slotIndex, {
@@ -744,7 +793,7 @@ function PracticePageContent() {
         error: 'SCORING_ERROR',
       });
     }
-  }, [getRecordingState, updateRecordingState]);
+  }, [getRecordingState, updateRecordingState, sentences]);
 
   // Handle upload to server
   const handleUploadRecording = useCallback(async (sentenceId: number, slotIndex: number) => {

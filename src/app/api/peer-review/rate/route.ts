@@ -1,7 +1,5 @@
 import { auth } from '@/auth';
-import postgres from 'postgres';
-
-const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+import sql from '@/lib/postgres';
 
 /**
  * POST /api/peer-review/rate

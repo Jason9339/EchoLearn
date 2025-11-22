@@ -1,9 +1,7 @@
 import { auth } from '@/auth';
-import postgres from 'postgres';
+import sql from '@/lib/postgres';
 import { getSupabaseAdmin } from '@/app/lib/supabase';
 import type { CreateCourseRequest, CreateCourseResponse } from '@/app/lib/definitions';
-
-const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
 /**
  * Process audio in background by calling the process-audio API

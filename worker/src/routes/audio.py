@@ -8,6 +8,7 @@ from services.audio_service import transcribe_audio, analyze_pronunciation
 from services.audio_scorer import AudioScorer
 import tempfile
 import os
+import subprocess
 
 # 創建 Blueprint
 audio_bp = Blueprint('audio', __name__)
@@ -157,9 +158,19 @@ def score_audio():
             test_path = test_tmp.name
             test_audio.save(test_path)
 
+        # === 如果上傳的是 webm 格式，轉成 wav 格式 ===
+        wav_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+        wav_path = wav_tmp.name
+        wav_tmp.close()
+
+        # ffmpeg 轉檔
+        subprocess.run([
+            "ffmpeg", "-y", "-i", test_path, wav_path
+        ], check=True)
+
         # === 呼叫你的 AudioScorer（它需要檔案路徑，不是 ndarray）===
         scorer = AudioScorer()
-        scores = scorer.score(ref_path, test_path)
+        scores = scorer.score(ref_path, wav_path)
 
         return jsonify({
             "success": True,
@@ -173,5 +184,6 @@ def score_audio():
         try:
             os.remove(ref_path)
             os.remove(test_path)
+            os.remove(wav_path)
         except Exception:
             pass

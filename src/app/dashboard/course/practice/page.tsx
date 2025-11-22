@@ -15,7 +15,7 @@ import RecordingButton from '@/components/RecordingButton';
 
 const fallbackCourseTitle = '口說練習';
 const DEFAULT_SENTENCES_PER_PAGE = 10;
-const SENTENCES_PER_PAGE_OPTIONS = [6, 10, 15, 20];
+const SENTENCES_PER_PAGE_OPTIONS = [10]; // Fixed to 10 sentences per page
 
 // Type for managing recording states for each sentence and slot
 type SentenceRecordingStates = {
@@ -961,52 +961,138 @@ function PracticePageContent() {
   // Show loading state for custom courses
   if (loading && isCustomCourse) {
     return (
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 md:py-12">
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-600">載入自訂課程中...</span>
+      <div className="min-h-screen bg-slate-50">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 sm:gap-6 px-4 py-4 sm:py-6 lg:py-8">
+          <div className="fixed inset-0 z-40 bg-white/80 backdrop-blur-sm flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3 rounded-xl border border-slate-200 bg-white px-6 py-5 shadow-xl">
+              <div className="h-8 w-8 border-2 border-slate-200 border-t-sky-500 rounded-full animate-spin"></div>
+              <div className="flex flex-col items-center gap-1">
+                <p className="text-sm sm:text-base font-medium text-slate-900">
+                  載入自訂課程中…
+                </p>
+                <p className="text-xs sm:text-sm text-slate-500">
+                  可能需要幾秒鐘，請稍候。
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 md:py-12">
-      <header className="rounded-xl bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm text-gray-500">
-              {currentCourse ? currentCourse.title : 'EchoLearn'}
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold text-gray-900">
-              {currentCourse?.title ?? fallbackCourseTitle}
-            </h1>
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 sm:gap-6 px-4 py-4 sm:py-6 lg:py-8">
+      <header className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-start gap-3 flex-1">
+            <div className="flex items-center justify-center rounded-md bg-slate-100 border border-slate-200 h-9 w-9 shadow-sm shrink-0">
+              <span className="text-sm font-bold tracking-tight text-sky-600">
+                SP
+              </span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-3">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                  {currentCourse?.title ?? fallbackCourseTitle}
+                </h1>
+                {isCustomCourse && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                    <span className="text-[0.7rem] font-medium text-slate-600">
+                      自訂課程
+                    </span>
+                  </span>
+                )}
+              </div>
+              <p className="text-sm sm:text-base text-slate-500">
+                {currentCourse?.description ?? defaultCourseDescription}
+              </p>
+            </div>
           </div>
           <Link
             href="/dashboard/course"
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 transition hover:border-gray-300 hover:text-gray-800"
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm"
           >
-            <ArrowUturnLeftIcon className="h-4 w-4" /> 返回課程列表
+            <ArrowUturnLeftIcon className="h-3.5 w-3.5" /> 返回課程列表
           </Link>
         </div>
-        <p className="mt-3 text-sm text-gray-600">
-          {currentCourse?.description ?? defaultCourseDescription}
-        </p>
       </header>
 
       {/* Instructions */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-blue-900 mb-2">使用說明</h3>
-        <ul className="text-sm text-blue-800 space-y-1">
-          <li>• 點擊「播放原音」聆聽標準發音</li>
-          <li>• 每個句子最多錄製 {maxRecordingSeconds} 秒</li>
-          <li>• 點擊圓形按鈕開始錄音，再點擊停止錄音</li>
-          <li>• 圓形按鈕背景動畫顯示剩餘時間</li>
-          <li>• 錄音完成後可以立即播放聽取</li>
-          <li className="font-semibold text-blue-900">• ⚠️ 錄音完成後記得按「上傳」按鈕才會儲存到系統</li>
-          <li className="font-semibold text-green-800">• 🎯 上傳後點擊「開始 AI 評分」獲取發音評分</li>
-        </ul>
-      </div>
+      <section className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-4 sm:px-5 sm:py-5 flex flex-col gap-3 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white border border-sky-100 shadow-sm shrink-0">
+            <svg className="w-4 h-4 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="flex-1 flex flex-col gap-1">
+            <h2 className="text-base sm:text-lg font-semibold tracking-tight text-sky-900">
+              使用說明
+            </h2>
+            <p className="text-sm sm:text-base text-sky-800/80">
+              每一句都依照下面步驟來練習：
+            </p>
+          </div>
+        </div>
+
+        <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 mt-1">
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-200 text-[0.7rem] font-bold text-sky-700">
+              1
+            </span>
+            <div className="flex flex-col gap-0.5">
+              <p className="text-sm sm:text-base font-medium text-slate-800">
+                先聽原音
+              </p>
+              <p className="text-xs sm:text-sm text-slate-500">
+                按下「播放原音」按鈕，熟悉標準發音節奏。
+              </p>
+            </div>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-200 text-[0.7rem] font-bold text-sky-700">
+              2
+            </span>
+            <div className="flex flex-col gap-0.5">
+              <p className="text-sm sm:text-base font-medium text-slate-800">
+                再錄音
+              </p>
+              <p className="text-xs sm:text-sm text-slate-500">
+                按下紅色錄音鍵開始，說完再按一次停止。
+              </p>
+            </div>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-200 text-[0.7rem] font-bold text-sky-700">
+              3
+            </span>
+            <div className="flex flex-col gap-0.5">
+              <p className="text-sm sm:text-base font-medium text-slate-800">
+                最多錄 {maxRecordingSeconds} 秒
+              </p>
+              <p className="text-xs sm:text-sm text-slate-500">
+                倒數結束會自動停止，建議一句話一次就好。
+              </p>
+            </div>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-200 text-[0.7rem] font-bold text-sky-700">
+              4
+            </span>
+            <div className="flex flex-col gap-0.5">
+              <p className="text-sm sm:text-base font-medium text-slate-800">
+                錄完記得上傳
+              </p>
+              <p className="text-xs sm:text-sm text-slate-500">
+                按「上傳錄音」，成功後才能請 AI 幫你評分。
+              </p>
+            </div>
+          </li>
+        </ol>
+      </section>
 
       <section className="space-y-6">
         <SentencePaginationControls
@@ -1033,18 +1119,37 @@ function PracticePageContent() {
               return Boolean(state.audioBlob || state.audioUrl);
             });
 
+            const slotIndex = 0;
+            const recordingState = getRecordingState(sentence.id, slotIndex);
+            const hasUploaded = recordingState.audioUrl && !recordingState.audioBlob;
+
             return (
               <article
                 key={sentence.id}
-                className="rounded-xl border bg-white p-6 shadow-sm transition hover:border-[#476EAE]/30"
+                className={`rounded-xl border p-4 sm:p-5 flex flex-col gap-4 shadow-sm ${
+                  hasUploaded
+                    ? 'border-emerald-200 bg-white ring-1 ring-emerald-500/10'
+                    : 'border-slate-200 bg-white'
+                }`}
               >
               {/* Sentence Content */}
-              <div className="mb-6">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex-1">
-                    <p className="text-lg font-medium text-gray-900">{sentence.text}</p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start gap-2 flex-1 min-w-0">
+                  <span className={`mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full text-[0.7rem] font-bold shrink-0 ${
+                    hasUploaded
+                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                      : 'bg-slate-100 text-slate-600 border border-slate-200'
+                  }`}>
+                    {sentence.id}
+                  </span>
+                  <div className="flex flex-col gap-1 flex-1 min-w-0 max-w-4xl">
+                    <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-900">{sentence.text}</h3>
+                    {sentence.translation && (
+                      <p className="text-sm sm:text-base text-slate-500">{sentence.translation}</p>
+                    )}
                   </div>
-                  <div className="flex items-center gap-3">
+                </div>
+                <div className="flex items-center gap-3 ml-7 sm:ml-0 shrink-0">
                     {/* Future Feature: Square Recording Button - Currently Disabled */}
                     {/*
                     {(() => {
@@ -1120,98 +1225,196 @@ function PracticePageContent() {
                       <button
                         type="button"
                         onClick={() => handlePlay(sentence)}
-                        className="inline-flex items-center gap-2 rounded-lg bg-[#476EAE] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#5A85C9]"
+                        className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm"
                       >
-                        <PlayIcon className="h-5 w-5" /> 播放原音
+                        <PlayIcon className="w-3.5 h-3.5 fill-slate-400 text-slate-400" />
+                        播放原音
                       </button>
                     )}
-                  </div>
                 </div>
               </div>
 
-              {/* Recording Section - Single recording button */}
-              <div className="border-t pt-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-medium text-gray-900">錄音練習</h3>
-                  {hasAnyRecording && (
-                    <span className="text-xs text-[#476EAE] bg-[#476EAE]/10 px-2 py-1 rounded-full font-medium">
-                      ✓ 已錄音
+              {/* Recording Section */}
+              <div className={`flex flex-col gap-3 rounded-lg border p-3 sm:p-4 ${
+                hasUploaded
+                  ? 'border-emerald-100 bg-emerald-50/30'
+                  : recordingState.audioBlob
+                  ? 'border-amber-100 bg-amber-50'
+                  : 'border-slate-200 bg-slate-50/50'
+              }`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs sm:text-sm font-medium text-slate-700">
+                      錄音
                     </span>
-                  )}
+                    <span className="text-[0.7rem] sm:text-xs text-slate-400">
+                      最多 {maxRecordingSeconds} 秒
+                    </span>
+                  </div>
+                  <div className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${
+                    hasUploaded
+                      ? 'bg-emerald-50 border border-emerald-100'
+                      : recordingState.audioBlob
+                      ? 'bg-amber-50 border border-amber-100'
+                      : 'bg-slate-200'
+                  }`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${
+                      hasUploaded
+                        ? 'bg-emerald-500'
+                        : recordingState.audioBlob
+                        ? 'bg-amber-500'
+                        : 'bg-slate-500'
+                    }`}></span>
+                    <span className={`text-[0.7rem] font-medium ${
+                      hasUploaded
+                        ? 'text-emerald-700'
+                        : recordingState.audioBlob
+                        ? 'text-amber-700'
+                        : 'text-slate-600'
+                    }`}>
+                      {hasUploaded
+                        ? '上傳完成，可以請 AI 評分'
+                        : recordingState.audioBlob
+                        ? '已錄音，尚未上傳'
+                        : '尚未錄音'}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Single Recording Button */}
-                <div className="flex flex-col items-center gap-4">
-                  {(() => {
-                    const slotIndex = 0; // Use only slot 0 for single recording
-                    const recordingState = getRecordingState(sentence.id, slotIndex);
-                    const hasUploaded = recordingState.audioUrl && !recordingState.audioBlob;
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <RecordingButton
+                    slotIndex={slotIndex}
+                    sentenceId={sentence.id}
+                    recordingState={recordingState}
+                    onStartRecording={() => handleStartRecording(sentence.id, slotIndex)}
+                    onStopRecording={() => handleStopRecording(sentence.id, slotIndex)}
+                    onPlayRecording={() => handlePlayRecording(sentence.id, slotIndex)}
+                    onUploadRecording={() => handleUploadRecording(sentence.id, slotIndex)}
+                    onDeleteRecording={() => handleDeleteRecording(sentence.id, slotIndex)}
+                    hasPlayedOriginal={playedSentences.has(sentence.id)}
+                    showDetails={false}
+                  />
 
-                    return (
-                      <>
-                        <RecordingButton
-                          slotIndex={slotIndex}
-                          sentenceId={sentence.id}
-                          recordingState={recordingState}
-                          onStartRecording={() => handleStartRecording(sentence.id, slotIndex)}
-                          onStopRecording={() => handleStopRecording(sentence.id, slotIndex)}
-                          onPlayRecording={() => handlePlayRecording(sentence.id, slotIndex)}
-                          onUploadRecording={() => handleUploadRecording(sentence.id, slotIndex)}
-                          onDeleteRecording={() => handleDeleteRecording(sentence.id, slotIndex)}
-                          hasPlayedOriginal={playedSentences.has(sentence.id)}
-                        />
+                  <div className="flex flex-col sm:items-end gap-2">
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                      {/* Play Recording Button */}
+                      {(recordingState.audioBlob || recordingState.audioUrl) && !recordingState.isRecording && (
+                        <button
+                          type="button"
+                          onClick={() => handlePlayRecording(sentence.id, slotIndex)}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+                          </svg>
+                          播放錄音
+                        </button>
+                      )}
 
-                        {/* AI Scoring Button - shown after recording is uploaded */}
-                        {hasUploaded && (
+                      {/* Upload Button */}
+                      {recordingState.audioBlob && !hasUploaded && (
+                        <>
                           <button
                             type="button"
-                            onClick={() => handleStartScoring(sentence.id, slotIndex)}
-                            disabled={recordingState.isScoring}
-                            className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-sm font-medium text-white transition hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            onClick={() => handleUploadRecording(sentence.id, slotIndex)}
+                            disabled={recordingState.isUploading}
+                            className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs sm:text-sm font-medium shadow-sm ${
+                              recordingState.isUploading
+                                ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
+                                : 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100'
+                            }`}
                           >
-                            {recordingState.isScoring ? (
-                              <>
-                                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                評分中...
-                              </>
-                            ) : (
-                              <>
-                                <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
-                                </svg>
-                                開始 AI 評分
-                              </>
-                            )}
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            {recordingState.isUploading ? '上傳中...' : '上傳錄音'}
                           </button>
-                        )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRecording(sentence.id, slotIndex)}
+                            disabled={recordingState.isDeleting || recordingState.isUploading}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                            </svg>
+                            {recordingState.isDeleting ? '刪除中...' : '刪除'}
+                          </button>
+                        </>
+                      )}
 
-                        {/* Score Display */}
-                        {recordingState.score !== null && recordingState.score !== undefined && (
-                          <div className="w-full max-w-md p-6 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-xl">
-                            <div className="text-center">
-                              <p className="text-sm text-gray-600 mb-2">AI 評分結果</p>
-                              <div className="flex items-center justify-center gap-3">
-                                <div className="text-5xl font-bold text-blue-600">
-                                  {recordingState.score}
-                                </div>
-                                <div className="text-2xl text-gray-400">/</div>
-                                <div className="text-3xl font-semibold text-gray-600">5</div>
-                              </div>
-                              <p className="text-xs text-gray-500 mt-3">
-                                {recordingState.score >= 4 ? '🌟 優秀！' :
-                                 recordingState.score >= 3 ? '👍 良好！' :
-                                 recordingState.score >= 2 ? '💪 不錯，繼續加油！' :
-                                 '📚 多練習會更好！'}
-                              </p>
-                            </div>
+                      {/* Re-upload Button */}
+                      {hasUploaded && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRecording(sentence.id, slotIndex)}
+                          disabled={recordingState.isDeleting}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          重新錄製
+                        </button>
+                      )}
+
+                      {/* AI Scoring Button */}
+                      {hasUploaded && (
+                        <button
+                          type="button"
+                          onClick={() => handleStartScoring(sentence.id, slotIndex)}
+                          disabled={recordingState.isScoring}
+                          className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs sm:text-sm font-medium shadow-sm ${
+                            recordingState.isScoring
+                              ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
+                              : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                          }`}
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+                          </svg>
+                          {recordingState.isScoring ? '評分中...' : (recordingState.score !== null && recordingState.score !== undefined ? '重新 AI 評分' : '開始 AI 評分')}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Score Display */}
+                    {recordingState.score !== null && recordingState.score !== undefined && (
+                      <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-white px-3 py-2 shadow-sm">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-50 border border-emerald-100 shrink-0">
+                          <span className="text-xs sm:text-sm font-bold text-emerald-600">
+                            {recordingState.score}
+                            <span className="text-[0.65rem] text-emerald-400 font-normal">
+                              /5
+                            </span>
+                          </span>
+                        </div>
+                        <div className="flex-1 flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs sm:text-sm font-bold text-emerald-700">
+                              AI 評分：{recordingState.score} / 5
+                            </span>
+                            <span className="text-[0.7rem] text-emerald-600">
+                              {recordingState.score >= 4 ? '發音清楚，語調自然。' :
+                               recordingState.score >= 3 ? '發音不錯，可以更流暢。' :
+                               recordingState.score >= 2 ? '繼續練習，會更進步。' :
+                               '多聽多練，加油！'}
+                            </span>
                           </div>
-                        )}
-                      </>
-                    );
-                  })()}
+                          <p className="text-xs sm:text-sm text-slate-600">
+                            {recordingState.score >= 4
+                              ? '表現優秀！繼續保持，可以挑戰更難的句子。'
+                              : recordingState.score >= 3
+                              ? '不錯的表現，再多練習幾次會更好。'
+                              : recordingState.score >= 2
+                              ? '有進步空間，建議多聽原音並模仿語調。'
+                              : '建議多聽幾次原音，注意發音和語調。'
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               </article>
@@ -1235,6 +1438,7 @@ function PracticePageContent() {
           />
         )}
       </section>
+      </div>
     </div>
   );
 }
@@ -1254,80 +1458,110 @@ type SentencePaginationControlsProps = {
 };
 
 function SentencePaginationControls({
-  idSuffix,
   currentPage,
   totalPages,
-  perPage,
-  perPageOptions,
   onPageChange,
-  onPageSizeChange,
   showingFrom,
   showingTo,
   totalItems,
   className = '',
 }: SentencePaginationControlsProps) {
-  const selectId = `sentences-per-page-${idSuffix}`;
   const disablePrev = currentPage <= 1 || totalItems === 0;
   const disableNext = currentPage >= totalPages || totalItems === 0;
 
   return (
-    <div
-      className={`flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-100 bg-white/80 px-4 py-3 text-sm shadow-sm ${className}`}
-    >
-      <div>
-        <p className="text-xs text-gray-500">目前顯示</p>
-        <p className="text-sm font-semibold text-gray-900">
-          {totalItems === 0 ? '尚無句子' : `${showingFrom} - ${showingTo} / ${totalItems} 句`}
-        </p>
+    <section className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${className}`}>
+      <div className="flex flex-wrap items-center gap-3 text-sm sm:text-base">
+        <span className="text-xs sm:text-sm text-slate-600">
+          共 {totalItems} 句，目前顯示第 {totalItems === 0 ? 0 : showingFrom}–{showingTo} 句
+        </span>
       </div>
 
-      <div className="flex items-center gap-2">
-        <label htmlFor={selectId} className="text-sm text-gray-600">
-          每頁顯示
-        </label>
-        <select
-          id={selectId}
-          value={perPage}
-          onChange={(event) => onPageSizeChange(Number(event.target.value))}
-          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-[#476EAE] focus:outline-none focus:ring-2 focus:ring-[#476EAE]/20"
+      <div className="flex items-center gap-2 text-sm sm:text-base">
+        <button
+          type="button"
+          onClick={() => onPageChange(1)}
+          disabled={disablePrev}
+          className={`inline-flex h-8 items-center justify-center rounded-md border border-slate-200 bg-white px-2 shadow-sm ${
+            disablePrev
+              ? 'text-slate-400 cursor-not-allowed opacity-50'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+          }`}
+          aria-label="第一頁"
         >
-          {perPageOptions.map((option) => (
-            <option key={option} value={option}>
-              {option} 句
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="flex items-center gap-2">
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M18.75 19.5l-7.5-7.5 7.5-7.5m-6 15L5.25 12l7.5-7.5" />
+          </svg>
+        </button>
         <button
           type="button"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={disablePrev}
-          className={`rounded-lg border px-3 py-1.5 font-medium transition ${
+          className={`inline-flex h-8 items-center justify-center rounded-md border border-slate-200 bg-white px-2 shadow-sm ${
             disablePrev
-              ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
-              : 'border-[#476EAE]/40 bg-white text-[#476EAE] hover:bg-[#476EAE]/10'
+              ? 'text-slate-400 cursor-not-allowed opacity-50'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
           }`}
+          aria-label="上一頁"
         >
-          上一頁
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
         </button>
-        <span className="text-sm text-gray-600">
-          第 {totalItems === 0 ? 0 : currentPage} / {totalPages} 頁
-        </span>
+
+        <div className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 shadow-sm">
+          <span className="text-xs sm:text-sm text-slate-500">
+            第
+          </span>
+          <input
+            type="number"
+            value={totalItems === 0 ? 0 : currentPage}
+            onChange={(e) => {
+              const page = parseInt(e.target.value, 10);
+              if (!isNaN(page) && page >= 1 && page <= totalPages) {
+                onPageChange(page);
+              }
+            }}
+            className="w-10 bg-transparent border-0 text-center text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-0 font-medium"
+            min="1"
+            max={totalPages}
+          />
+          <span className="text-xs sm:text-sm text-slate-400">
+            / {totalPages}
+          </span>
+        </div>
+
         <button
           type="button"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={disableNext}
-          className={`rounded-lg border px-3 py-1.5 font-medium transition ${
+          className={`inline-flex h-8 items-center justify-center rounded-md border border-slate-200 bg-white px-2 shadow-sm ${
             disableNext
-              ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
-              : 'border-[#476EAE]/40 bg-white text-[#476EAE] hover:bg-[#476EAE]/10'
+              ? 'text-slate-400 cursor-not-allowed opacity-50'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
           }`}
+          aria-label="下一頁"
         >
-          下一頁
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange(totalPages)}
+          disabled={disableNext}
+          className={`inline-flex h-8 items-center justify-center rounded-md border border-slate-200 bg-white px-2 shadow-sm ${
+            disableNext
+              ? 'text-slate-400 cursor-not-allowed opacity-50'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+          }`}
+          aria-label="最後一頁"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 4.5l7.5 7.5-7.5 7.5m6-15l7.5 7.5-7.5 7.5" />
+          </svg>
         </button>
       </div>
-    </div>
+    </section>
   );
 }

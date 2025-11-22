@@ -1,12 +1,10 @@
 import { auth } from '@/auth';
-import postgres from 'postgres';
+import sql from '@/lib/postgres';
 import { transcribeAudio, splitIntoSentences, generateAudioSegments, isOpenAIConfigured } from '@/lib/openai';
 import { trimIntroFromAudio } from '@/lib/audio-segmentation';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
-
-const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
 /**
  * POST /api/courses/process-audio

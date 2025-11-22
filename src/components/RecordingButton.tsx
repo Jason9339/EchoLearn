@@ -1,6 +1,6 @@
 'use client';
 
-import { MicrophoneIcon, StopIcon, CheckCircleIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, TrashIcon } from '@heroicons/react/24/outline';
 import AudioPlayer from '@/components/AudioPlayer';
 import type { RecordingButtonProps, ButtonState } from '@/types/audio';
 import { MAX_RECORDING_DURATION_MS } from '@/types/audio';
@@ -66,16 +66,29 @@ export default function RecordingButton({
 
   const getIcon = () => {
     const state = getButtonState();
-    
+
     switch (state) {
       case 'recording':
-        return <StopIcon className="h-6 w-6" />;
+        return <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-sm bg-white" />;
+      case 'recorded':
+        if (isUploaded) {
+          return (
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 fill-current" viewBox="0 0 24 24">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+            </svg>
+          );
+        }
+        return (
+          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        );
       case 'uploading':
         return (
-          <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
         );
       default:
-        return <MicrophoneIcon className="h-6 w-6" />;
+        return <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-white" />;
     }
   };
 
@@ -155,24 +168,23 @@ export default function RecordingButton({
             (recordingState.isUploading && !recordingState.isRecording)
           }
           className={`
-            relative w-16 h-16 rounded-full flex items-center justify-center
-            transition-all duration-300 ease-in-out transform hover:scale-105
-            focus:outline-none focus:ring-4 focus:ring-opacity-50
+            relative w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center
+            transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95
+            focus:outline-none focus:ring-2 focus:ring-opacity-50
             ${buttonState === 'recording'
-              ? 'bg-red-500 hover:bg-red-600 focus:ring-red-300 text-white'
+              ? 'bg-rose-500 hover:bg-rose-600 focus:ring-rose-300 text-white shadow-lg shadow-rose-500/20'
               : buttonState === 'recorded'
               ? isUploaded
-                ? 'bg-[#A7E399] hover:bg-[#8FD47E] focus:ring-[#A7E399]/30 text-gray-800'
-                : 'bg-[#476EAE] hover:bg-[#5A85C9] focus:ring-[#476EAE]/30 text-white'
+                ? 'bg-emerald-500 hover:bg-emerald-600 focus:ring-emerald-300 text-white shadow-lg shadow-emerald-500/20'
+                : 'bg-white border border-slate-200 hover:bg-slate-50 focus:ring-slate-300 text-slate-600 shadow-sm'
               : buttonState === 'uploading'
-              ? 'bg-[#476EAE] hover:bg-[#5A85C9] focus:ring-[#476EAE]/30 text-white'
+              ? 'bg-white border border-slate-200 hover:bg-slate-50 focus:ring-slate-300 text-slate-600 shadow-sm'
               : buttonState === 'ready'
-              ? 'bg-[#476EAE] hover:bg-[#5A85C9] focus:ring-[#476EAE]/30 text-white'
+              ? 'bg-rose-500 hover:bg-rose-600 focus:ring-rose-300 text-white shadow-lg shadow-rose-500/20'
               : buttonState === 'disabled'
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : 'bg-gray-100 hover:bg-gray-200 focus:ring-gray-300 text-gray-700'
+              ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+              : 'bg-slate-100 hover:bg-slate-200 focus:ring-slate-300 text-slate-700'
             }
-            shadow-lg hover:shadow-xl
           `}
           aria-label={getButtonText()}
         >
@@ -209,24 +221,24 @@ export default function RecordingButton({
         {/* Recording Progress Ring */}
         {buttonState === 'recording' && (
           <div className="absolute inset-0 rounded-full pointer-events-none">
-            <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 64 64">
+            <svg className="w-10 h-10 sm:w-12 sm:h-12 transform -rotate-90" viewBox="0 0 48 48">
               <circle
-                cx="32"
-                cy="32"
-                r="28"
+                cx="24"
+                cy="24"
+                r="20"
                 stroke="rgba(255, 255, 255, 0.3)"
-                strokeWidth="4"
+                strokeWidth="3"
                 fill="none"
               />
               <circle
-                cx="32"
-                cy="32"
-                r="28"
+                cx="24"
+                cy="24"
+                r="20"
                 stroke="white"
-                strokeWidth="4"
+                strokeWidth="3"
                 fill="none"
-                strokeDasharray={`${2 * Math.PI * 28}`}
-                strokeDashoffset={`${2 * Math.PI * 28 * (1 - Math.min(recordingState.duration / MAX_RECORDING_DURATION_MS, 1))}`}
+                strokeDasharray={`${2 * Math.PI * 20}`}
+                strokeDashoffset={`${2 * Math.PI * 20 * (1 - Math.min(recordingState.duration / MAX_RECORDING_DURATION_MS, 1))}`}
                 className="transition-all duration-100 ease-out"
               />
             </svg>
@@ -234,18 +246,31 @@ export default function RecordingButton({
         )}
       </div>
 
-      {/* Button Label */}
-      <div className="text-center">
-        <div className="text-sm font-medium text-gray-700">
-          {getButtonText()}
+      {/* Recording Duration Display */}
+      {!showDetails && recordingState.isRecording && (
+        <div className="text-center">
+          <div className="text-xs sm:text-sm font-medium text-slate-700 tabular-nums">
+            {(recordingState.duration / 1000).toFixed(1)}s
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Upload Status */}
-      {recordingState.isUploading && (
-        <div className="text-xs text-blue-600 font-medium">
-          ⬆️ 上傳中...
-        </div>
+      {showDetails && (
+        <>
+          {/* Button Label */}
+          <div className="text-center">
+            <div className="text-sm font-medium text-gray-700">
+              {getButtonText()}
+            </div>
+          </div>
+
+          {/* Upload Status */}
+          {recordingState.isUploading && (
+            <div className="text-xs text-blue-600 font-medium">
+              ⬆️ 上傳中...
+            </div>
+          )}
+        </>
       )}
 
       {/* Error Display - Only show non-PLAY_FIRST errors */}

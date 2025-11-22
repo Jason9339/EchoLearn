@@ -1,9 +1,7 @@
 import { auth } from '@/auth';
 import { extractStoragePathFromUrl } from '@/app/lib/audio';
 import { getSupabaseAdmin } from '@/app/lib/supabase';
-import postgres from 'postgres';
-
-const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+import sql from '@/lib/postgres';
 
 /**
  * GET /api/audio/recordings

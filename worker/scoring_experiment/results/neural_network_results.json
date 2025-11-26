@@ -1,0 +1,37 @@
+{
+  "features": [
+    "score_PER",
+    "score_PPG",
+    "score_GOP",
+    "score_GPE_offset",
+    "score_FFE",
+    "score_Energy",
+    "score_VDE"
+  ],
+  "excluded_features": [
+    "score_WER"
+  ],
+  "num_features": 7,
+  "device": "cpu",
+  "results": {
+    "mlp_regressor": {
+      "rmse": 1.0057805950573904,
+      "mae": 0.819496349924941,
+      "exact_accuracy": 30.522088353413658,
+      "adjacent_accuracy": 86.74698795180723
+    },
+    "mlp_classifier": {
+      "rmse": 1.2116076441844283,
+      "mae": 0.9188085676028113,
+      "exact_accuracy": 40.562248995983936,
+      "adjacent_accuracy": 78.714859437751
+    },
+    "ordinal_regressor": {
+      "rmse": 0.9846164731984327,
+      "mae": 0.7922570014091673,
+      "exact_accuracy": 30.923694779116467,
+      "adjacent_accuracy": 88.75502008032129
+    }
+  },
+  "best_model": "ordinal_regressor"
+}

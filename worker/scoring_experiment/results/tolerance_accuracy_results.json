@@ -1,0 +1,92 @@
+{
+  "basic_metrics": {
+    "rmse": 0.9655215394154715,
+    "mae": 0.7730687586869792
+  },
+  "recommended_metrics": {
+    "adjacent_star_accuracy": 87.55020080321285,
+    "exact_match_accuracy": 34.13654618473896,
+    "half_star_accuracy": 38.95582329317269
+  },
+  "tolerance_percent_analysis": [
+    {
+      "percent": 5,
+      "range": 0.2,
+      "accuracy": 17.269076305220885
+    },
+    {
+      "percent": 10,
+      "range": 0.4,
+      "accuracy": 33.33333333333333
+    },
+    {
+      "percent": 15,
+      "range": 0.6,
+      "accuracy": 44.97991967871486
+    },
+    {
+      "percent": 20,
+      "range": 0.8,
+      "accuracy": 57.42971887550201
+    },
+    {
+      "percent": 25,
+      "range": 1.0,
+      "accuracy": 69.47791164658635
+    },
+    {
+      "percent": 30,
+      "range": 1.2,
+      "accuracy": 78.3132530120482
+    },
+    {
+      "percent": 40,
+      "range": 1.6,
+      "accuracy": 90.76305220883533
+    },
+    {
+      "percent": 50,
+      "range": 2.0,
+      "accuracy": 96.3855421686747
+    }
+  ],
+  "star_tolerance_analysis": [
+    {
+      "tolerance": 0.25,
+      "accuracy": 20.481927710843372
+    },
+    {
+      "tolerance": 0.5,
+      "accuracy": 38.95582329317269
+    },
+    {
+      "tolerance": 0.75,
+      "accuracy": 56.62650602409639
+    },
+    {
+      "tolerance": 1.0,
+      "accuracy": 69.47791164658635
+    },
+    {
+      "tolerance": 1.5,
+      "accuracy": 88.35341365461848
+    },
+    {
+      "tolerance": 2.0,
+      "accuracy": 96.3855421686747
+    }
+  ],
+  "feature_importance": {
+    "score_PER": 0.17353646444061294,
+    "score_PPG": 0.22942652495491805,
+    "score_GOP": 0.10373518719372028,
+    "score_GPE_offset": 0.1101228346728201,
+    "score_FFE": 0.11688674400806362,
+    "score_Energy": 0.16651056679729376,
+    "score_VDE": 0.0997816779325714
+  },
+  "excluded_features": [
+    "score_WER"
+  ],
+  "reason": "WER excluded for multi-language support"
+}

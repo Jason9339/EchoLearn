@@ -15,6 +15,34 @@ export const courses: Course[] = [
     actionLabel: '開始練習',
     practicePath: '/dashboard/course/practice?courseId=daily-practice',
   },
+  {
+    id: 'truku-indigenous',
+    title: '太魯閣族語',
+    description: '太魯閣族語跟讀課程，學習原住民族語言。(5句)',
+    actionLabel: '開始練習',
+    practicePath: '/dashboard/course/practice?courseId=truku-indigenous',
+  },
+  {
+    id: 'taiwanese',
+    title: '台語跟讀',
+    description: '台語跟讀課程，學習台灣閩南語。(5句)',
+    actionLabel: '開始練習',
+    practicePath: '/dashboard/course/practice?courseId=taiwanese',
+  },
+  {
+    id: 'hakka',
+    title: '客語錄音',
+    description: '客家語跟讀課程，學習客家話。(4句)',
+    actionLabel: '開始練習',
+    practicePath: '/dashboard/course/practice?courseId=hakka',
+  },
+  {
+    id: 'bunun-indigenous',
+    title: '布農族語',
+    description: '布農族語跟讀課程，學習原住民族語言。(5句)',
+    actionLabel: '開始練習',
+    practicePath: '/dashboard/course/practice?courseId=bunun-indigenous',
+  },
 ];
 
 export const practiceSentences: Record<string, PracticeSentence[]> = {
@@ -500,6 +528,128 @@ export const practiceSentences: Record<string, PracticeSentence[]> = {
       text: 'I suppose you wonder why she is coming up here.',
       translation: '女: ',
       audioSrc: '/audio/cmu_us_clb_arctic/arctic_a0040.wav',
+    },
+  ],
+  'truku-indigenous': [
+    {
+      id: 1,
+      text: 'Hiya o lupung mu.',
+      translation: '他是我的朋友。',
+      audioSrc: '/audio/truku_indigenous/tst1.mp3',
+    },
+    {
+      id: 2,
+      text: 'Niqan cih blbul ka hini.',
+      translation: '這裡有一些香蕉。',
+      audioSrc: '/audio/truku_indigenous/tst2.mp3',
+    },
+    {
+      id: 3,
+      text: 'Qmnuyux paru bi quyux.',
+      translation: '下過一場大雨。',
+      audioSrc: '/audio/truku_indigenous/tst3.mp3',
+    },
+    {
+      id: 4,
+      text: 'Malu ka karat sayang da.',
+      translation: '今天天氣好了。',
+      audioSrc: '/audio/truku_indigenous/tst4.mp3',
+    },
+    {
+      id: 5,
+      text: 'Knuwan ka pneingan su?',
+      translation: '你的生日是什麼時候？',
+      audioSrc: '/audio/truku_indigenous/tst5.mp3',
+    },
+  ],
+  'taiwanese': [
+    {
+      id: 1,
+      text: '我不知道發生什麼事情?',
+      translation: '',
+      audioSrc: '/audio/taiwanese/taiwan_ref_01.mp3',
+    },
+    {
+      id: 2,
+      text: '我早就知道他有問題',
+      translation: '',
+      audioSrc: '/audio/taiwanese/taiwan_ref_02.mp3',
+    },
+    {
+      id: 3,
+      text: '這件事情我們有需要商量一下',
+      translation: '',
+      audioSrc: '/audio/taiwanese/taiwan_ref_03.mp3',
+    },
+    {
+      id: 4,
+      text: '你出門在外，自己千萬要小心',
+      translation: '',
+      audioSrc: '/audio/taiwanese/taiwan_ref_04.mp3',
+    },
+    {
+      id: 5,
+      text: '下雨天的時候，這條路就變得很難走',
+      translation: '',
+      audioSrc: '/audio/taiwanese/taiwan_ref_05.mp3',
+    },
+  ],
+  'hakka': [
+    {
+      id: 1,
+      text: '你會肚屎枵無？',
+      translation: '你餓嗎？',
+      audioSrc: '/audio/hakka/hakka_gt_1.mp3',
+    },
+    {
+      id: 2,
+      text: '請問高鐵車頭仰般行？',
+      translation: '請問高鐵車站怎麼走？',
+      audioSrc: '/audio/hakka/hakka_gt_2.mp3',
+    },
+    {
+      id: 3,
+      text: '來去點心店食點心！',
+      translation: '到小吃店去吃點心！',
+      audioSrc: '/audio/hakka/hakka_gt_3.mp3',
+    },
+    {
+      id: 4,
+      text: '今晡日放尞，毋使去學校。',
+      translation: '今天放假，不必上學。',
+      audioSrc: '/audio/hakka/hakka_gt_4.mp3',
+    },
+  ],
+  'bunun-indigenous': [
+    {
+      id: 1,
+      text: 'Mihumisang, muhnang maisin pasadu.',
+      translation: '再見，下次再相見。',
+      audioSrc: '/audio/bunun_indigenous/1.mp3',
+    },
+    {
+      id: 2,
+      text: 'Mandia saikin mas maibabu mais maun haising.',
+      translation: '我吃飯時配豬肉。',
+      audioSrc: '/audio/bunun_indigenous/2.mp3',
+    },
+    {
+      id: 3,
+      text: 'Iskunghuav kuzkuza-unan ii, aupa namaunin haising.',
+      translation: '停下這個工作吧，因為已經要吃飯了。',
+      audioSrc: '/audio/bunun_indigenous/3.mp3',
+    },
+    {
+      id: 4,
+      text: 'Nakudiip a inaak tama hanup.',
+      translation: '我爸爸要去打獵。',
+      audioSrc: '/audio/bunun_indigenous/4.mp3',
+    },
+    {
+      id: 5,
+      text: 'Niin laupaku uvavaaz mazima maun pintcingmut.',
+      translation: '現在的小孩不喜歡吃早餐了。',
+      audioSrc: '/audio/bunun_indigenous/5.mp3',
     },
   ],
 };

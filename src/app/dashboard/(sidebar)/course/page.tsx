@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { courses } from '@/app/lib/placeholder-data';
 import CourseCard from '@/app/ui/dashboard/cards';
 import type { UserCourse } from '@/app/lib/definitions';
-import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, TrashIcon, XMarkIcon, ExclamationTriangleIcon, ArrowPathIcon, FolderPlusIcon, ArrowRightIcon, XCircleIcon } from '@heroicons/react/24/outline';
 
 export default function CourseListPage() {
   const { data: session } = useSession();
@@ -44,13 +44,13 @@ export default function CourseListPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'text-green-600 bg-green-100';
+        return 'inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700';
       case 'processing':
-        return 'text-blue-600 bg-blue-100';
+        return 'inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700';
       case 'failed':
-        return 'text-red-600 bg-red-100';
+        return 'inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700';
       default:
-        return 'text-gray-600 bg-gray-100';
+        return 'inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-700';
     }
   };
 
@@ -61,7 +61,7 @@ export default function CourseListPage() {
       case 'processing':
         return '處理中';
       case 'failed':
-        return '處理失敗';
+        return '失敗';
       default:
         return '未知';
     }
@@ -114,11 +114,13 @@ export default function CourseListPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-12">
       {/* Built-in Courses */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">官方課程</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <section className="space-y-6">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-xl font-semibold tracking-tight text-gray-900">官方課程</h2>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {courses.map((course) => (
             <CourseCard
               key={course.id}
@@ -126,150 +128,194 @@ export default function CourseListPage() {
               description={course.description}
               actionLabel={course.actionLabel}
               actionHref={course.practicePath}
+              icon={course.id === 'business-english' ? 'briefcase' : 'book'}
             />
           ))}
         </div>
-      </div>
+      </section>
 
       {/* Divider */}
-      <div className="border-t border-gray-200"></div>
+      <div className="h-px w-full bg-gray-100"></div>
 
       {/* Custom Courses */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-gray-900">我的自訂課程</h2>
+      <section className="space-y-6">
+        <div className="flex items-end justify-between">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-xl font-semibold tracking-tight text-gray-900">我的自訂課程</h2>
+            <p className="text-sm text-gray-500">管理您上傳的教材與學習進度。</p>
+          </div>
           <Link
             href="/dashboard/course/upload"
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="group inline-flex items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:ring-offset-2"
           >
-            <PlusIcon className="h-5 w-5 mr-2" />
+            <PlusIcon className="mr-2 h-4 w-4" />
             創建新課程
           </Link>
         </div>
 
         {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-2 text-gray-600">載入中...</p>
+          <div className="py-12 text-center">
+            <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600"></div>
+            <p className="mt-3 text-sm text-gray-500">正在同步資料...</p>
           </div>
         ) : customCourses.length === 0 ? (
-          <div className="text-center py-8 bg-gray-50 rounded-lg">
-            <p className="text-gray-600 mb-4">您還沒有創建任何自訂課程</p>
-            <Link
-              href="/dashboard/course/upload"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-            >
-              <PlusIcon className="h-5 w-5 mr-2" />
-              創建第一個課程
-            </Link>
+          <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/50 p-12 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
+              <FolderPlusIcon className="h-6 w-6 text-blue-500" />
+            </div>
+            <h3 className="mt-4 text-sm font-medium text-gray-900">尚無自訂課程</h3>
+            <p className="mt-1 text-sm text-gray-500">上傳您的第一個音頻或影片檔案開始學習。</p>
+            <div className="mt-6">
+              <Link
+                href="/dashboard/course/upload"
+                className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                <PlusIcon className="mr-2 h-4 w-4" />
+                創建第一個課程
+              </Link>
+            </div>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {customCourses.map((course) => (
               <div
                 key={course.id}
-                className="bg-white rounded-lg shadow-md p-6 border border-gray-200 hover:shadow-lg transition-shadow"
+                className={`group relative flex items-center justify-between rounded-xl border bg-white p-5 transition-all duration-200 hover:shadow-sm ${
+                  course.status === 'failed'
+                    ? 'border-red-100 hover:border-red-200'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
               >
-                <div className="flex items-start justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-gray-900 truncate">
-                    {course.title}
-                  </h3>
-                  <span
-                    className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(course.status)}`}
+                {/* Left side - Content */}
+                <div className="flex-1 min-w-0 pr-4">
+                  <div className="space-y-1">
+                    <h3 className="truncate text-base font-medium text-gray-900">
+                      {course.title}
+                    </h3>
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                      <span>{course.maxSentences || 0} 句</span>
+                      <span>•</span>
+                      <span>{new Date(course.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+
+                  <p className="mt-3 line-clamp-2 text-sm text-gray-500">
+                    {course.description || '無描述'}
+                  </p>
+
+                  <div className="mt-3">
+                    <span className={getStatusColor(course.status)}>
+                      {course.status === 'processing' && (
+                        <ArrowPathIcon className="mr-1 h-3 w-3 animate-spin" />
+                      )}
+                      {getStatusText(course.status)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Right side - Action Icons */}
+                <div className="flex flex-col gap-2 flex-shrink-0">
+                  {course.status === 'completed' && (
+                    <Link
+                      href={`/dashboard/course/practice?courseId=${course.id}&custom=true`}
+                      className="inline-flex h-12 w-12 items-center justify-center rounded-lg border-2 border-gray-400 text-gray-700 transition-colors hover:border-gray-600 hover:bg-gray-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                      title="開始練習"
+                    >
+                      <ArrowRightIcon className="h-6 w-6" />
+                    </Link>
+                  )}
+
+                  {course.status === 'processing' && (
+                    <Link
+                      href={`/dashboard/course/processing/${course.id}`}
+                      className="inline-flex h-12 w-12 items-center justify-center rounded-lg border-2 border-gray-400 text-gray-700 transition-colors hover:border-gray-600 hover:bg-gray-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                      title="查看進度"
+                    >
+                      <ArrowRightIcon className="h-6 w-6" />
+                    </Link>
+                  )}
+
+                  {course.status === 'failed' && (
+                    <div
+                      className="inline-flex h-12 w-12 items-center justify-center rounded-lg border-2 border-gray-300 text-gray-400 cursor-not-allowed"
+                      title="處理失敗"
+                    >
+                      <XCircleIcon className="h-6 w-6" />
+                    </div>
+                  )}
+
+                  {/* Delete Button */}
+                  <button
+                    onClick={() => handleDeleteClick(course.id, course.title)}
+                    disabled={deleting === course.id}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-gray-300 text-gray-400 transition-colors hover:border-red-500 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="刪除課程"
                   >
-                    {getStatusText(course.status)}
-                  </span>
+                    {deleting === course.id ? (
+                      <ArrowPathIcon className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <TrashIcon className="h-5 w-5" />
+                    )}
+                  </button>
                 </div>
-                
-                <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                  {course.description || '無描述'}
-                </p>
-                
-                <div className="text-xs text-gray-500 mb-4">
-                  最大句數: {course.maxSentences} | 創建時間: {new Date(course.createdAt).toLocaleDateString()}
-                </div>
-
-                       <div className="flex space-x-2">
-                         <div className="flex-1">
-                           {course.status === 'completed' && (
-                             <Link
-                               href={`/dashboard/course/practice?courseId=${course.id}&custom=true`}
-                               className="block w-full bg-blue-600 text-white text-center py-2 px-4 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
-                             >
-                               開始練習
-                             </Link>
-                           )}
-
-                           {course.status === 'processing' && (
-                             <Link
-                               href={`/dashboard/course/processing/${course.id}`}
-                               className="block w-full bg-blue-100 text-blue-700 text-center py-2 px-4 rounded-md text-sm font-medium hover:bg-blue-200 transition-colors"
-                             >
-                               查看進度
-                             </Link>
-                           )}
-
-                           {course.status === 'failed' && (
-                             <button className="w-full bg-red-100 text-red-700 text-center py-2 px-4 rounded-md text-sm font-medium cursor-not-allowed">
-                               處理失敗
-                             </button>
-                           )}
-                         </div>
-
-                         {/* Delete Button */}
-                         <button
-                           onClick={() => handleDeleteClick(course.id, course.title)}
-                           disabled={deleting === course.id}
-                           className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                           title="刪除課程"
-                         >
-                           {deleting === course.id ? (
-                             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600"></div>
-                           ) : (
-                             <TrashIcon className="h-5 w-5" />
-                           )}
-                         </button>
-                       </div>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </section>
 
       {/* Delete Confirmation Dialog */}
       {deleteConfirm.isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
-              確定要刪除課程嗎？
-            </h3>
-            <p className="text-sm text-gray-600 mb-6">
-              您即將刪除課程「<strong>{deleteConfirm.courseTitle}</strong>」。
-              <br />
-              <span className="text-red-600 font-medium">
-                此操作將永久刪除課程內容、錄音資料和相關檔案，且無法復原。
-              </span>
-            </p>
-            <div className="flex space-x-3 justify-end">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/20 backdrop-blur-sm p-4 transition-opacity duration-200"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleDeleteCancel();
+          }}
+        >
+          <div className="relative w-full max-w-sm overflow-hidden rounded-xl bg-white p-6 shadow-2xl ring-1 ring-gray-900/5 transform transition-all duration-200">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center justify-center h-10 w-10 rounded-full bg-red-50 text-red-600">
+                <ExclamationTriangleIcon className="h-5 w-5" />
+              </div>
               <button
                 onClick={handleDeleteCancel}
+                className="text-gray-400 hover:text-gray-500 transition-colors"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            <h3 className="text-base font-semibold leading-6 text-gray-900">刪除課程</h3>
+            <div className="mt-2">
+              <p className="text-sm text-gray-500">
+                您確定要刪除 <span className="font-medium text-gray-900">{deleteConfirm.courseTitle}</span> 嗎？此操作無法復原。
+              </p>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleDeleteCancel}
                 disabled={deleting !== null}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 取消
               </button>
               <button
+                type="button"
                 onClick={handleDeleteConfirm}
                 disabled={deleting !== null}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                className="inline-flex justify-center items-center rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {deleting === deleteConfirm.courseId ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <ArrowPathIcon className="h-4 w-4 animate-spin mr-2" />
                     刪除中...
                   </>
                 ) : (
-                  '確定刪除'
+                  '確認刪除'
                 )}
               </button>
             </div>

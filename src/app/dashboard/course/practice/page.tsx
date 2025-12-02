@@ -770,18 +770,15 @@ function PracticePageContent() {
 
       const result = await apiResponse.json();
 
-      if (result.success && result.scores) {
-        // 4. Process scores and calculate a final score (0-5)
-        const { PER, PPG, GOP, WER } = result.scores;
-        // Simple average of key metrics, scaled to 5.
-        const avgScore = (PER + PPG + GOP + WER) / 4;
-        const finalScore = Math.round(avgScore * 5);
+      if (result.success && result.rating !== undefined) {
+        // 4. Use the model's predicted rating (1-5, rounded to 1 decimal place)
+        const finalScore = Math.round(result.rating * 10) / 10;
 
         updateRecordingState(sentenceId, slotIndex, {
           isScoring: false,
           score: finalScore,
         });
-        console.log(`[AI Scoring] Sentence ${sentenceId}, Slot ${slotIndex}: ${finalScore}/5`, result.scores);
+        console.log(`[AI Scoring] Sentence ${sentenceId}, Slot ${slotIndex}: ${finalScore}/5.0`);
       } else {
         throw new Error(result.error || 'Scoring failed, invalid response from server.');
       }
@@ -1392,7 +1389,7 @@ function PracticePageContent() {
                         <div className="flex-1 flex flex-col gap-0.5">
                           <div className="flex items-center gap-1">
                             <span className="text-xs sm:text-sm font-bold text-emerald-700">
-                              AI 評分：{recordingState.score} / 5
+                              AI 評分：{recordingState.score?.toFixed(1)} / 5.0
                             </span>
                             <span className="text-[0.7rem] text-emerald-600">
                               {recordingState.score >= 4 ? '發音清楚，語調自然。' :

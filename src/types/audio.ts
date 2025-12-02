@@ -24,7 +24,7 @@ export interface RecordingState {
   recordingId: string | null;
   /** Whether AI scoring is in progress */
   isScoring?: boolean;
-  /** AI score result (0-100) */
+  /** AI score result (1-5, with one decimal place) */
   score?: number | null;
 }
 

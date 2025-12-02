@@ -11,6 +11,7 @@ import torchaudio
 from services.phoneme_ctc import PhoneCTC
 from services.speech_metrics import SpeechMetrics
 from services.cal_wer_gop import get_wer_score
+from services.predictor import RatingPredictor
 
 
 class AudioScorer:
@@ -54,39 +55,34 @@ class AudioScorer:
         print("初始化 SpeechMetrics...")
         self.speech_metrics = SpeechMetrics()
 
+        print("初始化 RatingPredictor...")
+        self.rating_predictor = RatingPredictor()
+
         print("✅ AudioScorer 初始化完成")
 
     def score(
         self,
         reference_audio: Union[str, Path],
         test_audio: Union[str, Path]
-    ) -> Dict[str, float]:
+    ) -> float:
         """
-        計算所有評分指標
+        計算模型預測評分 (只計算必要的三個指標)
 
         Args:
             reference_audio: 參考音檔路徑
             test_audio: 要評分的音檔路徑
 
         Returns:
-            包含所有指標分數的字典，所有指標都是「越高越好」(0-1之間)
-            {
-                'PER': float,        # 音素錯誤率相似度 (1 - PER)
-                'PPG': float,        # 音素後驗圖相似度
-                'GOP': float,        # 發音質量 (Goodness of Pronunciation)
-                'GPE_offset': float, # 音高相似度 (補償音高偏移)
-                'FFE': float,        # F0 幀相似度
-                'WER': float,        # 詞錯誤率相似度 (1 - WER, clipped)
-                'Energy': float,     # 能量相似度
-                'VDE': float         # 濁音判斷相似度
-            }
+            float: 模型預測的人類評分 (1-5 分)
         """
         ref_path = str(reference_audio)
         test_path = str(test_audio)
 
         scores = {}
 
-        # === PhoneCTC 相關指標 (PER, PPG, GOP) ===
+        # === 只計算模型需要的三個指標 ===
+
+        # 1. PhoneCTC 相關指標 (PER, PPG)
         ref_wav, ref_sr = torchaudio.load(ref_path)
         test_wav, test_sr = torchaudio.load(test_path)
 
@@ -103,20 +99,18 @@ class AudioScorer:
         # PPG 相似度
         scores['PPG'] = self._calculate_ppg_similarity(ref_logp, test_logp)
 
-        # GOP-new
-        scores['GOP'] = self._calculate_gop(ref_logp, ref_spans, test_logp, test_spans)
-
-        # === WER 相似度 (1 - WER, clipped) ===
-        wer_raw = get_wer_score(test_path, ref_path)
-        scores['WER'] = max(0.0, 1.0 - wer_raw)  # clip 避免負值
-
-        # === SpeechMetrics 相關指標 (韻律特徵) ===
-        scores['GPE_offset'] = self.speech_metrics.calculate_gpe_offset(ref_path, test_path)
-        scores['FFE'] = self.speech_metrics.calculate_ffe(ref_path, test_path)
+        # 2. Energy 相似度
         scores['Energy'] = self.speech_metrics.calculate_energy_similarity(ref_path, test_path)
-        scores['VDE'] = self.speech_metrics.calculate_vde(ref_path, test_path)
 
-        return scores
+        # === 使用模型預測人類評分 (1-5 分) ===
+        model_features = {
+            'score_PER': scores['PER'],
+            'score_PPG': scores['PPG'],
+            'score_Energy': scores['Energy']
+        }
+        rating = self.rating_predictor.predict(model_features)
+
+        return rating
 
     def _calculate_per_similarity(self, ref_phones: list, test_phones: list) -> float:
         """

@@ -130,16 +130,7 @@ def score_audio():
     Response:
         {
             "success": true,
-            "scores": {
-                'PER': float,
-                'PPG': float,
-                'GOP': float,
-                'GPE_offset': float,
-                'FFE': float,
-                'WER': float,
-                'Energy': float,
-                'VDE': float
-            }
+            "rating": float  # 模型預測的人類評分 (1-5 分)
         }
     """
     try:
@@ -170,11 +161,11 @@ def score_audio():
 
         # === 呼叫你的 AudioScorer（它需要檔案路徑，不是 ndarray）===
         scorer = AudioScorer()
-        scores = scorer.score(ref_path, wav_path)
+        rating = scorer.score(ref_path, wav_path)
 
         return jsonify({
             "success": True,
-            "scores": scores
+            "rating": rating
         })
 
     except Exception as e:

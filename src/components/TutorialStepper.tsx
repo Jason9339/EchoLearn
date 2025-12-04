@@ -164,6 +164,7 @@ export default function TutorialStepper({ steps }: TutorialStepperProps) {
                       )
                     }
                     className="absolute top-1/2 left-2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+                    aria-label="上一張圖片"
                   >
                     <ChevronLeftIcon className="w-5 h-5" />
                   </button>
@@ -176,6 +177,7 @@ export default function TutorialStepper({ steps }: TutorialStepperProps) {
                       )
                     }
                     className="absolute top-1/2 right-2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+                    aria-label="下一張圖片"
                   >
                     <ChevronRightIcon className="w-5 h-5" />
                   </button>
@@ -191,6 +193,8 @@ export default function TutorialStepper({ steps }: TutorialStepperProps) {
                             ? "bg-white w-4"
                             : "bg-white/50"
                         }`}
+                        aria-label={`前往圖片 ${idx + 1}`}
+                        {...(idx === currentImageIndex ? { "aria-current": "true" } : {})}
                       />
                     ))}
                   </div>
@@ -220,7 +224,7 @@ export default function TutorialStepper({ steps }: TutorialStepperProps) {
             disabled={isLast}
             className={`flex items-center gap-2 px-5 py-2 rounded-lg font-medium transition-colors ${
               isLast
-                ? "bg-emerald-500 text-white cursor-default"
+                ? "bg-emerald-500 text-white cursor-not-allowed"
                 : "bg-sky-500 text-white hover:bg-sky-600"
             }`}
           >

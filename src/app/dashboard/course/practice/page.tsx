@@ -328,10 +328,9 @@ function PracticePageContent() {
     try {
       console.log('[Load Scores] Fetching scores for:', {
         userId: session.user.id,
-        courseId: currentCourseId,
+        currentCourseId,
         isCustomCourse,
-        selectedCourseId,
-        courseId
+        selectedCourseId
       });
 
       const url = `/api/worker/audio/scores?user_id=${encodeURIComponent(session.user.id)}&course_id=${encodeURIComponent(currentCourseId)}`;

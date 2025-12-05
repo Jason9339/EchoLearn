@@ -23,26 +23,20 @@ export const authConfig = {
       return true;
     },
     // Add JWT callback to include user id in token
-    async jwt({ token, user, trigger }) {
-      // 當登出時，清空 token
-      if (trigger === 'signOut') {
-        return {};
-      }
-
+    async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
       }
       return token;
     },
     // Add session callback to include user id in session
-    async session({ session, token, trigger }) {
-      // 當登出時，返回空 session
-      if (trigger === 'signOut' || !token || Object.keys(token).length === 0) {
+    async session({ session, token }) {
+      // 檢查 token 是否為空（登出後可能為空）
+      if (!token || !token.id) {
+        // 返回一個最小的 session 對象，但保持類型安全
         return {
-          ...session,
-          user: undefined as any,
           expires: new Date(0).toISOString(), // 設為已過期
-        };
+        } as typeof session;
       }
 
       if (token && session.user) {

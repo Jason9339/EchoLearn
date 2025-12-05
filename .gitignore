@@ -58,3 +58,5 @@ cloudflared-linux-amd64.deb
 /worker/temp/*
 !/worker/temp/.gitkeep
 
+.claude/
+CLAUDE.md

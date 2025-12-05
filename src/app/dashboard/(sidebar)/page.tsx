@@ -114,12 +114,8 @@ export default function Page() {
       description:
         "上傳成功後，點擊「開始 AI 評分」按鈕。AI 會分析您的錄音與原音的相似度，並給予 1-5 分的評分。",
       details: [
-        "音素相似度 (PER)：發音的音素是否正確",
-        "聲學特徵 (PPG)：整體音色和發音品質",
-        "發音質量 (GOP)：每個音素的發音準確度",
-        "語調相似度 (GPE)：音高變化是否與原音一致",
-        "節奏相似度 (FFE/Energy)：語速和音量變化",
-        "發聲特性 (VDE)：濁音/清音的判斷正確性",
+        "AI 會根據音素相似度、聲學特徵、發音質量等多個指標進行評分",
+        "評分結果會顯示在錄音區塊中",
       ],
       icon: <SparklesIcon className="w-6 h-6 text-sky-600" />,
       highlight: "AI 驅動",

@@ -34,6 +34,7 @@ export default function TutorialStepper({ steps }: TutorialStepperProps) {
   };
 
   const goToNext = () => {
+    // only advance when not on the last step
     if (!isLast) {
       setCurrentStep(currentStep + 1);
       setCurrentImageIndex(0);
@@ -224,27 +225,12 @@ export default function TutorialStepper({ steps }: TutorialStepperProps) {
             disabled={isLast}
             className={`flex items-center gap-2 px-5 py-2 rounded-lg font-medium transition-colors ${
               isLast
-                ? "bg-emerald-500 text-white cursor-not-allowed"
+                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                 : "bg-sky-500 text-white hover:bg-sky-600"
             }`}
           >
-            {isLast ? (
-              <>
-                完成
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    fillRule="evenodd"
-                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </>
-            ) : (
-              <>
-                下一步
-                <ChevronRightIcon className="w-5 h-5" />
-              </>
-            )}
+            下一步
+            <ChevronRightIcon className="w-5 h-5" />
           </button>
         </div>
       </div>

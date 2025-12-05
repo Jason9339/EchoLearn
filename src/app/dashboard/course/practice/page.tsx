@@ -35,7 +35,7 @@ export default function PracticePage() {
 }
 
 function PracticePageContent() {
-  const { status: sessionStatus } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -311,6 +311,64 @@ function PracticePageContent() {
     });
   }, [initializeRecordingState]);
 
+  // Load existing AI scores from database
+  const loadExistingScores = useCallback(async () => {
+    if (!session?.user?.id || sessionStatus !== 'authenticated') {
+      console.log('[Load Scores] Skipping - user not authenticated');
+      return;
+    }
+
+    const currentCourseId = isCustomCourse ? selectedCourseId : courseId;
+
+    if (!currentCourseId) {
+      console.log('[Load Scores] Skipping - no course ID available yet');
+      return;
+    }
+
+    try {
+      console.log('[Load Scores] Fetching scores for:', {
+        userId: session.user.id,
+        currentCourseId,
+        isCustomCourse,
+        selectedCourseId
+      });
+
+      const url = `/api/worker/audio/scores?user_id=${encodeURIComponent(session.user.id)}&course_id=${encodeURIComponent(currentCourseId)}`;
+      console.log('[Load Scores] Request URL:', url);
+
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Load Scores] Failed to fetch scores:', response.status, errorText);
+        return;
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.scores) {
+        console.log('[Load Scores] Loaded scores:', result.scores);
+
+        // Update recording states with loaded scores
+        Object.entries(result.scores).forEach(([sentenceIdStr, slots]) => {
+          const sentenceId = parseInt(sentenceIdStr);
+
+          Object.entries(slots as Record<string, number>).forEach(([slotIndexStr, score]) => {
+            const slotIndex = parseInt(slotIndexStr);
+
+            updateRecordingState(sentenceId, slotIndex, {
+              score: score as number,
+            });
+          });
+        });
+
+        console.log('[Load Scores] Scores loaded successfully');
+      }
+    } catch (error) {
+      console.error('[Load Scores] Error loading scores:', error);
+    }
+  }, [session, sessionStatus, isCustomCourse, selectedCourseId, courseId, updateRecordingState]);
+
   // Load existing recordings and ratings on mount
   useEffect(() => {
     if (sessionStatus === 'loading' || sessionStatus === 'unauthenticated') {
@@ -372,12 +430,14 @@ function PracticePageContent() {
     };
 
     loadRecordings();
-    // Note: Ratings functionality removed for application mode
+
+    // Load AI scores from database
+    loadExistingScores();
 
     return () => {
       controller.abort();
     };
-  }, [sessionStatus, updateRecordingState, isCustomCourse ? selectedCourseId : courseId]);
+  }, [sessionStatus, updateRecordingState, loadExistingScores, isCustomCourse, selectedCourseId, courseId]);
 
   // Cleanup effect for component unmount
   useEffect(() => {
@@ -751,10 +811,38 @@ function PracticePageContent() {
         testResponse.blob()
       ]);
 
-      // 2. Create FormData and append files
+      // 2. Create FormData and append files and metadata
       const formData = new FormData();
       formData.append('reference_audio', refBlob, 'reference.wav');
       formData.append('test_audio', testBlob, 'test.wav');
+
+      // Add metadata for caching scores in database
+      console.log('[AI Scoring] Session check:', {
+        hasSession: !!session,
+        hasUser: !!session?.user,
+        hasUserId: !!session?.user?.id,
+        userId: session?.user?.id,
+        sessionStatus: sessionStatus
+      });
+
+      if (session?.user?.id) {
+        const metadata = {
+          user_id: session.user.id,
+          course_id: isCustomCourse ? selectedCourseId : courseId,
+          sentence_id: String(sentenceId),
+          slot_index: String(slotIndex),
+        };
+
+        console.log('[AI Scoring] Sending metadata:', metadata);
+
+        formData.append('user_id', metadata.user_id);
+        formData.append('course_id', metadata.course_id);
+        formData.append('sentence_id', metadata.sentence_id);
+        formData.append('slot_index', metadata.slot_index);
+      } else {
+        console.warn('[AI Scoring] No session user ID - scores will not be cached');
+        console.warn('[AI Scoring] Please ensure you are logged in');
+      }
 
       // 3. Call the backend API via the Next.js proxy
       const apiResponse = await fetch('/api/worker/audio/score', {
@@ -770,18 +858,18 @@ function PracticePageContent() {
 
       const result = await apiResponse.json();
 
-      if (result.success && result.scores) {
-        // 4. Process scores and calculate a final score (0-5)
-        const { PER, PPG, GOP, WER } = result.scores;
-        // Simple average of key metrics, scaled to 5.
-        const avgScore = (PER + PPG + GOP + WER) / 4;
-        const finalScore = Math.round(avgScore * 5);
+      if (result.success && result.rating !== undefined) {
+        // 4. Use the model's predicted rating (1-5, rounded to 1 decimal place)
+        const finalScore = Math.round(result.rating * 10) / 10;
 
         updateRecordingState(sentenceId, slotIndex, {
           isScoring: false,
           score: finalScore,
         });
-        console.log(`[AI Scoring] Sentence ${sentenceId}, Slot ${slotIndex}: ${finalScore}/5`, result.scores);
+
+        // Log whether score was cached or newly computed
+        const cacheStatus = result.cached ? '(cached)' : '(computed)';
+        console.log(`[AI Scoring] Sentence ${sentenceId}, Slot ${slotIndex}: ${finalScore}/5.0 ${cacheStatus}`);
       } else {
         throw new Error(result.error || 'Scoring failed, invalid response from server.');
       }
@@ -793,7 +881,7 @@ function PracticePageContent() {
         error: 'SCORING_ERROR',
       });
     }
-  }, [getRecordingState, updateRecordingState, sentences]);
+  }, [getRecordingState, updateRecordingState, sentences, session, isCustomCourse, selectedCourseId, courseId]);
 
   // Handle upload to server
   const handleUploadRecording = useCallback(async (sentenceId: number, slotIndex: number) => {
@@ -931,6 +1019,31 @@ function PracticePageContent() {
         throw new Error(result.error || 'DELETE_FAILED');
       }
 
+      // 同時刪除資料庫中的 AI 評分
+      if (session?.user?.id) {
+        const currentCourseId = isCustomCourse ? selectedCourseId : courseId;
+        if (currentCourseId) {
+          try {
+            await fetch('/api/worker/audio/score', {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                user_id: session.user.id,
+                course_id: currentCourseId,
+                sentence_id: sentenceId,
+                slot_index: slotIndex,
+              }),
+            });
+            console.log('[Delete Score] AI score deleted from database');
+          } catch (error) {
+            console.error('[Delete Score] Failed to delete AI score:', error);
+            // 不中斷流程，即使刪除評分失敗也繼續
+          }
+        }
+      }
+
       if (recordingState.audioUrl && recordingState.audioUrl.startsWith('blob:')) {
         URL.revokeObjectURL(recordingState.audioUrl);
       }
@@ -956,7 +1069,7 @@ function PracticePageContent() {
         error: errorCode,
       });
     }
-  }, [getRecordingState, sessionStatus, updateRecordingState]);
+  }, [getRecordingState, sessionStatus, updateRecordingState, session, isCustomCourse, selectedCourseId, courseId]);
 
   // Show loading state for custom courses
   if (loading && isCustomCourse) {
@@ -1392,7 +1505,7 @@ function PracticePageContent() {
                         <div className="flex-1 flex flex-col gap-0.5">
                           <div className="flex items-center gap-1">
                             <span className="text-xs sm:text-sm font-bold text-emerald-700">
-                              AI 評分：{recordingState.score} / 5
+                              AI 評分：{recordingState.score?.toFixed(1)} / 5.0
                             </span>
                             <span className="text-[0.7rem] text-emerald-600">
                               {recordingState.score >= 4 ? '發音清楚，語調自然。' :

@@ -23,7 +23,8 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
   // JWT 策略
   session: {
     strategy: 'jwt',
-    // 不設定 maxAge，讓瀏覽器決定（關閉瀏覽器後失效）
+    maxAge: 24 * 60 * 60, // 24 小時後過期
+    updateAge: 60 * 60, // 每 1 小時更新一次 session
   },
   cookies: {
     sessionToken: {
@@ -36,8 +37,33 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
-        // 關鍵：不設定 maxAge 和 expires，讓它成為 session cookie
-        // session cookie 會在關閉瀏覽器時自動刪除
+        // 設定 maxAge 確保 cookie 在指定時間後過期
+        maxAge: 24 * 60 * 60, // 24 小時
+      }
+    },
+    // 確保所有 callback cookies 也使用相同的安全設定
+    callbackUrl: {
+      name:
+        process.env.NODE_ENV === 'production'
+          ? '__Secure-authjs.callback-url'
+          : 'authjs.callback-url',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      }
+    },
+    csrfToken: {
+      name:
+        process.env.NODE_ENV === 'production'
+          ? '__Host-authjs.csrf-token'
+          : 'authjs.csrf-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
       }
     }
   },

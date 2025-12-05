@@ -2,6 +2,8 @@ import NavLinks from '@/app/ui/dashboard/nav-links';
 import { signOut } from '@/auth';
 import { PowerIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
+import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
 
 export default function SideNav() {
   return (
@@ -25,7 +27,24 @@ export default function SideNav() {
           className="mt-auto"
           action={async () => {
             'use server';
-            await signOut({ redirectTo: '/' });
+
+            // 清除所有相關的快取
+            revalidatePath('/', 'layout');
+
+            // 確保刪除所有 session cookies
+            const cookieStore = await cookies();
+            const allCookies = cookieStore.getAll();
+            allCookies.forEach(cookie => {
+              if (cookie.name.includes('authjs') || cookie.name.includes('session') || cookie.name.includes('next-auth')) {
+                cookieStore.delete(cookie.name);
+              }
+            });
+
+            // 執行登出
+            await signOut({
+              redirectTo: '/',
+              redirect: true
+            });
           }}
         >
           <button className="flex h-[48px] w-full items-center justify-center gap-2 rounded-md bg-gray-50 p-3 text-sm font-medium hover:bg-sky-100 hover:text-blue-600 md:justify-start md:p-2 md:px-3">

@@ -21,8 +21,13 @@ async function handler(
     // --- 3. 組合目標 URL ---
     // (現在 'params' 應該會有值了)
     const param = await params;
-    const path = param.slug.join('/'); 
-    const targetUrl = `${API_URL}/worker/${path}`; // (Python 前綴是 /worker)
+    const path = param.slug.join('/');
+
+    // 從請求 URL 中提取查詢參數
+    const url = new URL(request.url);
+    const queryString = url.search; // 包含 '?' 的完整查詢字串
+
+    const targetUrl = `${API_URL}/worker/${path}${queryString}`; // (Python 前綴是 /worker)
 
     console.log(`[PROXY] 正在代理: ${request.method} ${targetUrl}`);
 

@@ -1,12 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Carousel from "@/components/Carousel";
+import TutorialStepper, { TutorialStep } from "@/components/TutorialStepper";
+import {
+  BookOpenIcon,
+  PlayIcon,
+  MicrophoneIcon,
+  CloudArrowUpIcon,
+  SparklesIcon,
+} from "@heroicons/react/24/outline";
 
 export default function Page() {
   const [courseTutorialImages, setCourseTutorialImages] = useState<string[]>([]);
   const [recordingTutorialImages, setRecordingTutorialImages] = useState<string[]>([]);
-  const [peerReviewTutorialImages, setPeerReviewTutorialImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,7 +26,6 @@ export default function Page() {
         const data = await response.json();
         setCourseTutorialImages(data.courseTutorialImages);
         setRecordingTutorialImages(data.recordingTutorialImages);
-        setPeerReviewTutorialImages(data.peerReviewTutorialImages);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "An unknown error occurred");
       } finally {
@@ -31,154 +36,158 @@ export default function Page() {
     fetchImages();
   }, []);
 
+  const tutorialSteps: TutorialStep[] = [
+    {
+      id: "intro",
+      title: "歡迎使用 EchoLearn",
+      description:
+        "EchoLearn 是一個語音練習平台，透過「影子跟讀」的方式幫助您練習語言發音。聆聽標準發音，錄製您的聲音，AI 會即時給您評分回饋。",
+      details: [
+        "支援多種語言的發音練習",
+        "AI 自動評分",
+        "可上傳自己的音檔建立課程",
+      ],
+      icon: (
+        <svg className="w-6 h-6 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      ),
+      highlight: "快速上手",
+    },
+    {
+      id: "select-course",
+      title: "步驟一：選擇課程",
+      description:
+        "點擊左側選單的「Course」進入課程頁面。您可以選擇官方課程，或上傳自己的音檔建立自訂課程。選好課程後，點擊「開始練習」進入練習頁面。",
+      details: [
+        "官方課程：預設的標準發音練習",
+        "自訂課程：上傳 MP3 或影片，系統自動切分句子",
+        "每個課程包含多個練習句子",
+      ],
+      images: courseTutorialImages,
+      icon: <BookOpenIcon className="w-6 h-6 text-sky-600" />,
+    },
+    {
+      id: "listen",
+      title: "步驟二：聆聽原音",
+      description:
+        "進入練習頁面後，每個句子旁邊都有「播放原音」按鈕。請先點擊聆聽標準發音，熟悉語調和節奏後再開始錄音。",
+      details: [
+        "可以重複播放，直到熟悉為止",
+        "注意語調、節奏和發音細節",
+        "必須先播放原音，才能開始錄音",
+      ],
+      images: recordingTutorialImages.slice(0, 1),
+      icon: <PlayIcon className="w-6 h-6 text-sky-600" />,
+    },
+    {
+      id: "record",
+      title: "步驟三：錄製練習",
+      description:
+        "點擊紅色麥克風按鈕開始錄音。瀏覽器會請求麥克風權限，請點擊「允許」。跟著原音模仿發音，錄完後再次點擊按鈕停止。",
+      details: [
+        "每個句子可以重複錄製，每次最多 15 秒，最終只會保存一次錄音",
+        "圓形按鈕會顯示錄音倒數計時",
+        "錄完後可以播放確認效果",
+        "不滿意可以重新錄製",
+      ],
+      images: recordingTutorialImages.slice(1, 3),
+      icon: <MicrophoneIcon className="w-6 h-6 text-sky-600" />,
+      highlight: "重要步驟",
+    },
+    {
+      id: "upload",
+      title: "步驟四：上傳錄音",
+      description:
+        "錄音完成後，請點擊「上傳錄音」按鈕將錄音儲存到系統。上傳成功後，錄音區塊會顯示綠色的「上傳完成」狀態。",
+      details: [
+        "未上傳的錄音不會被儲存",
+        "上傳成功後才能請 AI 評分",
+        "可以刪除後重新錄製",
+      ],
+      images: recordingTutorialImages.slice(3),
+      icon: <CloudArrowUpIcon className="w-6 h-6 text-sky-600" />,
+    },
+    {
+      id: "ai-score",
+      title: "步驟五：AI 評分",
+      description:
+        "上傳成功後，點擊「開始 AI 評分」按鈕。AI 會分析您的錄音與原音的相似度，並給予 1-5 分的評分。",
+      details: [
+        "AI 會根據音素相似度、聲學特徵、發音質量等多個指標進行評分",
+        "評分結果會顯示在錄音區塊中",
+      ],
+      icon: <SparklesIcon className="w-6 h-6 text-sky-600" />,
+      highlight: "AI 驅動",
+    },
+    {
+      id: "tips",
+      title: "練習小技巧",
+      description:
+        "掌握以下技巧，讓您的練習更有效率！",
+      details: [
+        "找一個安靜的環境錄音，減少背景噪音",
+        "多聽幾次原音再開始錄製",
+        "注意語調和節奏，不只是發音正確",
+        "根據 AI 評分的回饋，針對弱點反覆練習",
+        "每天練習一點，效果比一次練很久更好",
+      ],
+      icon: (
+        <svg className="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+        </svg>
+      ),
+    },
+  ];
+
   if (loading) {
     return (
-      <div className="p-6 max-w-4xl mx-auto text-center text-gray-600">
-        載入教學圖片中...
+      <div className="p-6 max-w-4xl mx-auto">
+        <div className="flex flex-col items-center justify-center py-12">
+          <div className="w-10 h-10 border-4 border-sky-200 border-t-sky-500 rounded-full animate-spin"></div>
+          <p className="mt-4 text-gray-500">載入教學內容中...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-6 max-w-4xl mx-auto text-center text-red-600">
-        載入教學圖片失敗: {error}
+      <div className="p-6 max-w-4xl mx-auto">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+          <p className="text-red-600">載入教學圖片失敗: {error}</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">Dashboard</h1>
-      <p className="text-lg text-gray-700 mb-8">
-        歡迎來到 EchoLearn！以下是詳細的錄音與評分教學，幫助您快速上手。
-      </p>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">使用教學</h1>
+        <p className="text-gray-600">
+          跟著步驟學習如何使用 EchoLearn 練習發音
+        </p>
+      </div>
 
-      <div className="space-y-8 text-gray-700">
-        <div>
-          <h3 className="text-xl font-semibold mb-3 text-sky-700">
-            🎯 我們的目標
-          </h3>
-          <p>
-            歡迎您！為了打造更強大的語言學習模型，我們需要搜集大量的語音樣本及其評分。您的每一次錄音，都是對這個專案最直接的貢獻。
-          </p>
-        </div>
+      <TutorialStepper steps={tutorialSteps} />
 
-        <div>
-          <h3 className="text-xl font-semibold mb-3 text-sky-700">
-            🗺️ 網頁操作教學
-          </h3>
-          <div className="space-y-6">
-            <div>
-              <h4 className="font-bold text-lg mb-2">
-                步驟一：從 Dashboard 前往課程
-              </h4>
-              <p className="mb-3">
-                登入後，您會看見 Dashboard。請在左側的導覽列中選擇一個您想參加的{" "}
-                <span className="font-semibold text-sky-600">Course</span>
-                ，並點擊進入{" "}
-                <span className="font-semibold text-sky-600">Practice</span>{" "}
-                頁面開始錄音。
-              </p>
-              <div className="bg-gray-100 p-3 rounded-lg flex justify-center">
-                {courseTutorialImages.length > 0 ? (
-                  <Carousel images={courseTutorialImages} altPrefix="進入課程教學" />
-                ) : (
-                  <div className="text-center text-gray-500">無課程教學圖片</div>
-                )}
-              </div>
-            </div>
+      {/* Quick Start Card */}
+      <div className="mt-8 bg-gradient-to-r from-sky-500 to-sky-600 rounded-2xl p-6 text-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-bold mb-2">準備好開始練習了嗎？</h3>
+            <p className="text-sky-100">選擇一個課程，開始您的發音練習之旅！</p>
           </div>
-        </div>
-
-        <div>
-          <h3 className="text-xl font-semibold mb-3 text-sky-700">
-            🎙️ 錄音操作教學與規則
-          </h3>
-          <div className="space-y-6">
-            <div>
-              <h4 className="font-bold text-lg mb-2">錄音步驟</h4>
-              <p className="mb-3">
-                在 Practice
-                頁面，您會看到一個需要朗讀的句子。點擊「播放原音」聆聽標準發音，然後點擊「麥克風」按鈕開始錄音。在瀏覽器跳出授權請求時，請點擊「允許」。授權後錄音將自動開始，念完後再次點擊按鈕即可結束。
-              </p>
-              <div className="bg-gray-100 p-3 rounded-lg flex justify-center">
-                {recordingTutorialImages.length > 0 ? (
-                  <Carousel images={recordingTutorialImages} altPrefix="錄音步驟教學" />
-                ) : (
-                  <div className="text-center text-gray-500">無錄音步驟教學圖片</div>
-                )}
-              </div>
-            </div>
-            <div>
-              <h4 className="font-bold text-lg mb-2">錄音規則</h4>
-              <ul className="list-disc list-inside space-y-1 text-sm">
-                <li>點擊「播放原音」聆聽標準發音</li>
-                <li>每個句子可以錄製 3 次，每次最多約 10-15 秒 (實際秒數依課程設定)</li>
-                <li>點擊圓形按鈕開始錄音，再點擊停止錄音</li>
-                <li>圓形按鈕背景動畫會顯示剩餘時間</li>
-                <li>錄音完成後可以立即播放聽取自己的錄音</li>
-                <li>可以重新錄音覆蓋之前的錄音</li>
-                <li className="font-semibold text-blue-900">⚠️ 錄音完成後記得按「上傳」按鈕才會儲存到系統！</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <h3 className="text-xl font-semibold mb-3 text-sky-700">
-            ⭐ 評分標準與流程
-          </h3>
-          <div className="space-y-6">
-            <div>
-              <h4 className="font-bold text-lg mb-2">評分標準</h4>
-              <p className="mb-3">
-                評分是根據您錄製的音檔與「原始音檔」進行比對。請根據以下四個面向給予 1-5 分的評比：
-              </p>
-              <ul className="space-y-2 list-disc list-inside bg-sky-50 p-4 rounded-lg">
-                <li>
-                  <span className="font-bold">語調 (Tone)：</span>
-                  是否自然、符合語氣。
-                </li>
-                <li>
-                  <span className="font-bold">語速 (Speed)：</span>
-                  是否流暢、與原始音檔速度相符。
-                </li>
-                <li>
-                  <span className="font-bold">咬字 (Articulation)：</span>
-                  每個字的發音是否清晰。
-                </li>
-                <li>
-                  <span className="font-bold">發音 (Pronunciation)：</span>
-                  單字或音節的發音是否正確。
-                </li>
-              </ul>
-              <p className="mt-3 text-sm text-gray-600">
-                <span className="font-bold">評分範例：</span>
-                1分 (極差) 到 5分 (極佳)。例如：5分代表發音標準、語調自然、吐字清晰，就像母語人士一樣流暢。
-              </p>
-            </div>
-            <div>
-              <h4 className="font-bold text-lg mb-2">評分流程</h4>
-              <ul className="list-disc list-inside space-y-1">
-                <li>
-                  <span className="font-bold">自評：</span>
-                  在您完成錄音並上傳後，可以在錄音按鈕下方看到評分條。請根據上述標準，為自己的錄音給予評分。
-                </li>
-                <li>
-                  <span className="font-bold">為他人評分 (同儕審核)：</span>
-                  您可以前往 Dashboard 中的「同儕審核 (Peer Review)」頁面，聆聽其他使用者的錄音並給予評分。這有助於您提升聽力與辨音能力，同時也幫助其他學習者。
-                </li>
-              </ul>
-              <div className="bg-gray-100 p-3 rounded-lg flex justify-center">
-                {peerReviewTutorialImages.length > 0 ? (
-                  <Carousel images={peerReviewTutorialImages} altPrefix="同儕審核頁面截圖" />
-                ) : (
-                  <div className="text-center text-gray-500">無課程教學圖片</div>
-                )}
-              </div>
-            </div>
-          </div>
+          <a
+            href="/dashboard/course"
+            className="flex-shrink-0 inline-flex items-center gap-2 bg-white text-sky-600 px-5 py-3 rounded-xl font-semibold hover:bg-sky-50 transition-colors"
+          >
+            前往課程
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </a>
         </div>
       </div>
     </div>

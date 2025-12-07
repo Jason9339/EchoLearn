@@ -20,6 +20,8 @@ async function getUser(email: string): Promise<User | undefined> {
 
 export const { auth, signIn, signOut, handlers } = NextAuth({
   ...authConfig,
+  // Trust host for Vercel deployment
+  trustHost: true,
   // JWT 策略
   session: {
     strategy: 'jwt',

@@ -13,6 +13,17 @@ export const authConfig = {
       const isAuthPage = pathname === '/login' || pathname === '/register';
       const isApiRoute = pathname.startsWith('/api/');
 
+      // Log for debugging
+      if (isApiRoute && pathname.includes('/upload')) {
+        console.log('[Auth Config] API Route Check:', {
+          pathname,
+          isApiRoute,
+          isLoggedIn,
+          hasAuth: !!auth,
+          hasUser: !!auth?.user
+        });
+      }
+
       if (isApiRoute) {
         return true;
       }
